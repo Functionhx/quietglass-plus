@@ -1,49 +1,103 @@
 # QuietGlass Plus
 
-A fork of [QuietGlass](https://github.com/clintonimaroo/quietglass) by Clinton Imaro (MIT) focused on **all-day, low-power owner protection**: the screen stays clear only while a saved face is at the Mac, and covers itself when you leave, a stranger sits down, or someone looks over your shoulder.
+**A low-power privacy screen for macOS that covers your display when you step away — and, if you like, clears only for faces you've saved.**
+为 Mac 打造的低功耗隐私屏：离开即遮挡，回来按键解锁；也可以只为你保存的面孔解除。
 
-基于 [QuietGlass](https://github.com/clintonimaroo/quietglass) 的分支版本：**只有认出你（或你保存的人）时屏幕才清晰**，离开、陌生人坐下或有人在身后看时自动遮挡，并针对全天常驻做了功耗优化。
+[**Website & live demo →**](https://functionhx.github.io/quietglass-plus/) · macOS 14+ · Apple silicon recommended · MIT
 
-## What's different / 改动
+QuietGlass Plus is a fork of [QuietGlass](https://github.com/clintonimaroo/quietglass) by Clinton Imaro. Upstream is a feature-rich privacy toolkit (window and area blur, sensitive-text detection, AirPods head tracking). This fork keeps all of that and focuses on one job: **running all day in the background without costing battery**, while being harder to switch off for whoever sits down at your Mac.
 
-| | QuietGlass 0.1.2 | QuietGlass Plus |
+## Two ways to protect / 两种保护方式
+
+| | **Away** (default) · 离开模式（默认） | **Recognize me** · 识别本人 |
 |---|---|---|
-| Camera sensor rate | 30 fps (the 10 fps request is rejected by 15–30 fps cameras) | slowest supported rate (15 fps), native 420v frames |
-| Face analysis | ~11/s, every face, CPU | 3/s when settled, 10/s while verifying |
-| SFace embedding | CPU, 4.5 ms | Neural Engine, 0.85 ms (embeddings verified against CPU, cosine > 0.999) |
-| Cover while monitoring | full-resolution screen recording at 30 fps, kept warm | no screen capture; WindowServer-composited cover |
-| Cover styles | captured blur | **fold** (folding-phone animation), frosted, curtain, black, captured blur |
-| Saved faces | one | up to 5 named faces (partner, "me with glasses"…); saved people aren't onlookers |
-| Escape while covered | anyone can clear protection | needs Touch ID / password when Recognize me is on |
-| Screen lock / screen saver | camera keeps running | camera stops; after unlock your face clears at once, no second Touch ID |
-| Away for a long time | — | optional: lock the Mac after N minutes |
-| Head tracking | AirPods, camera | + **Sony WF-1000XM6 and other earbuds** speaking Android's head tracker HID protocol |
-| Language | English | English, 简体中文 (follows macOS or set in General) |
+| Covers when | no face for 3–30 s (default 5) | you leave, a stranger appears, or an extra face looks on |
+| Clears when | you press **Esc** + Touch ID (or the cover's button) | a saved face is recognized (optional head turn) |
+| Camera while you work | face detection only, 2/s | detection + recognition, 3/s steady, 10/s while verifying |
+| Camera while covered | **off** | on, waiting for you |
+| Recognition model | not loaded | SFace on the Neural Engine |
 
-Measured on a MacBook Air (M4): `cameracaptured` drops from ~21% to ~10% CPU by halving the sensor rate; the app idles at ~1% CPU with Settings open.
+Either mode can lock macOS after N minutes away. Head tracking (look away → cover) works with the camera, AirPods, or Sony/Android head-tracker earbuds.
 
-### Sony and other earbuds / Sony 等耳机
+## How it works / 原理
 
-Earbuds such as the Sony WF-1000XM6 expose Android's head tracker over Bluetooth HID (Sensor page `0x20`, usage `0xE1`, `#AndroidHeadTracker#1.0`). QuietGlass Plus reads it with IOHIDManager — no extra permission — and only powers the earbud sensor while tracking. Notes from testing: each new audio stream resets the reference frame (stitched), the orientation drifts for ~12 s after power-up (held back), and earbuds sit tilted in the ear, so covering uses the total rotation from center. Check yours with `QuietGlass.app/Contents/MacOS/QuietGlass --headphone-check` (voice-guided).
+```mermaid
+flowchart LR
+  cam["Camera<br/>15 fps sensor · 420v"] --> skip["skip frames<br/>2–10 analyses/s"]
+  skip --> vision["Vision face rectangles"]
+  vision -->|Away| away["AwayPolicy<br/>no face ≥ N s"]
+  vision -->|Recognize me| lm["landmarks → SFace on ANE<br/>128-d embedding"]
+  lm --> match["FaceProfiles (≤5, Keychain)<br/>→ OwnerPresence"]
+  hid["Sony WF-1000XM6<br/>HID head tracker 25 Hz"] --> stitch["reset stitching<br/>12 s warm-up"] --> offset["total rotation<br/>from center"]
+  away --> cover["PrivacyCover<br/>fold · frosted · curtain · black"]
+  match --> cover
+  offset --> cover
+  away -. covered .-> off["camera off"]
+```
+
+- **Covers never capture the screen.** `PrivacyCover` is a borderless panel above everything (including the notch controls) whose frosted layer is composited by WindowServer; the fold and curtain animations play over an already opaque first frame. After 15 s away it settles on black so WindowServer stops recomputing blur.
+- **Escape is borrowed only while something is covered.** Upstream registered Esc as a global hotkey whenever monitoring was on, which broke Esc in every app and turned protection off on a stray keypress.
+- **Earbud head tracking** reads Android's head-tracker HID report (rotation vector, angular velocity, reset counter) with IOHIDManager. Earbuds sit tilted in the ear, so covering uses the frame-independent rotation from the calibrated center.
+
+## Measured on a MacBook Air (M4)
+
+| | QuietGlass 0.1.2 | Plus |
+|---|---|---|
+| Camera sensor rate | 30 fps (its 10 fps request is outside the camera's 15–30 range) | 15 fps |
+| `cameracaptured` CPU | ~21 % | ~10 % — and 0 % while away |
+| SFace embedding | 4.5 ms, CPU | 0.85 ms, Neural Engine (cosine vs CPU > 0.999) |
+| Screen recording while monitoring | 30 fps, full resolution | none |
+| App CPU while head tracking | ~29 % (UI redrawn every sample) | ~1 % |
+
+Reproduce with `scripts/measure-power.sh` and `scripts/bench-pipeline.swift`.
 
 ## Build and install / 构建与安装
 
 ```sh
-scripts/setup-isolated-signing.sh          # once: stable local signing, keeps Camera approval across builds
+scripts/setup-isolated-signing.sh            # once: stable self-signed identity in its own keychain,
+                                             # so Camera approval survives rebuilds (no login-keychain changes)
 bash build.sh "$PWD/dist/QuietGlass.app"
 ditto dist/QuietGlass.app /Applications/QuietGlass.app
 ```
 
-First use: Settings → Protection → Nearby people → **Set up my face**, then turn on **Detect additional faces** (the master switch for camera protection).
-首次使用：设置 → 保护 → 附近有人 → **录入我的面孔**，然后打开 **摄像头自动保护（总开关）**。
+Then open **Settings → Protection**, choose a protection mode and turn on **Detect additional faces** (the master switch; 中文界面为“摄像头自动保护（总开关）”).
 
-Development aids: `--preview-cover fold|frosted|curtain|black`, `--headphone-check`, `scripts/measure-power.sh`, `scripts/bench-pipeline.swift`, `scripts/gen-localization.py --missing`.
+Requires Xcode 26 or later. `swift test` runs ~200 unit tests (ShieldCore policies, owner recognition, away monitor, earbud stitching, real Vision + SFace fixtures).
 
-Limitations are the same as upstream: an RGB camera cannot prove liveness (the head-turn check only raises the bar for photos), and a cover is not a lock — use the auto-lock option for longer absences.
+## What's new in this fork
 
----
+| Area | Files |
+|---|---|
+| Away mode | `Sources/ShieldCore/AwayPolicy.swift`, `Sources/QuietGlass/AwayMonitor.swift` |
+| Capture-free covers | `Sources/QuietGlass/PrivacyCover.swift` |
+| Up to 5 saved faces, migration from 0.1.x | `FaceProfile`/`FaceProfiles` in `OwnerRecognitionPolicy.swift`, `OwnerTemplateStore.swift` |
+| Adaptive camera rate, Neural Engine | `NearbyPeople.swift` (`FaceCamera`), `SharedFaceCamera.swift`, `OwnerFaceModel.swift` |
+| Earbud head tracking | `HIDHeadTracker.swift`, `HeadTrackerStitcher` + frame-independent `HeadOffset` in `ShieldResponse.swift` |
+| Screen lock / sleep handling, auto-lock | `AppModel.swift`, `ScreenLock.swift` |
+| Simplified Chinese | `Localization.swift`, `Resources/Localization/zh_Hans_*.py` → `scripts/gen-localization.py` |
 
-*Original README follows.*
+Developer aids:
+
+```sh
+QuietGlass.app/Contents/MacOS/QuietGlass --preview-cover fold   # fold | frosted | curtain | black
+QuietGlass.app/Contents/MacOS/QuietGlass --headphone-check      # voice-guided earbud test
+python3 scripts/gen-localization.py --missing                   # untranslated UI strings
+```
+
+## Privacy and limits / 隐私与局限
+
+Everything runs on the Mac. Frames are never saved; saved faces are 128-number templates in the login Keychain, and adding, deleting or loading them asks for Touch ID or your password. That said:
+
+- A cover is not a lock: if the app quits, the cover goes, and other software can still read the screen. Use *Lock Mac when I'm away* for longer absences.
+- An RGB camera cannot prove liveness. The optional head turn only raises the bar for photos; away mode unlocks with Touch ID by default.
+- Only people inside the camera's view can be detected.
+
+## Credits
+
+QuietGlass by [Clinton Imaro](https://github.com/clintonimaroo/quietglass) (MIT). SFace model from the OpenCV Zoo (Apache 2.0), converted to Core ML by upstream. Modifications © Functionhx, MIT.
+
+<details>
+<summary>Upstream QuietGlass README</summary>
 
 # QuietGlass
 
@@ -260,3 +314,5 @@ Please report vulnerabilities privately using the [Security Policy](SECURITY.md)
 QuietGlass is developed by Clinton Imaro and released under the [MIT License](LICENSE).
 
 Third-party models, icons, and audio retain their respective rights and attribution requirements. See the [icon license](Resources/Icons/LICENSE.md), [SFace model license](Resources/Models/SFace-LICENSE.txt), and [warning sound source notice](Resources/Sounds/NOTICE.txt).
+
+</details>

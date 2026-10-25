@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>QuietGlass Plus — 只有你在，屏幕才清晰</title>
+  <meta name="description" content="为 Mac 打造的低功耗 AI 隐私屏：离开即遮挡，回来一键解锁。全部在本机运行。">
+  <meta name="theme-color" content="#05060a" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f7f6fb" media="(prefers-color-scheme: light)">
+  <script>
+    (() => { const saved = localStorage.getItem("qg-theme");
+      document.documentElement.dataset.theme = saved || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark"); })();
+  </script>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23f0aee8'/%3E%3Cstop offset='.5' stop-color='%23a78bfa'/%3E%3Cstop offset='1' stop-color='%237dd3fc'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='9' fill='url(%23g)'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <canvas id="aurora" aria-hidden="true"></canvas>
+  <div class="grain" aria-hidden="true"></div>
+
+  <nav class="nav">
+    <a class="brand" href="#top"><span class="brand-mark"></span>QuietGlass <em>Plus</em></a>
+    <div class="nav-links">
+      <a href="#story" data-i18n="nav.story">原理</a>
+      <a href="#styles" data-i18n="nav.styles">效果</a>
+      <a href="#power" data-i18n="nav.power">功耗</a>
+      <a href="#earbuds" data-i18n="nav.earbuds">耳机</a>
+      <a href="#try" data-i18n="nav.try">试一试</a>
+      <a href="#install" data-i18n="nav.install">安装</a>
+    </div>
+    <div class="nav-actions">
+      <button class="theme" id="theme" aria-label="Switch light or dark theme"></button>
+      <button class="lang" id="lang" aria-label="Switch language">EN</button>
+      <a class="btn btn-ghost small" href="https://github.com/Functionhx/quietglass-plus">GitHub</a>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <header class="hero" id="top">
+    <p class="eyebrow reveal" data-i18n="hero.eyebrow">macOS 隐私屏 · Apple 芯片 · 全部本地运行</p>
+    <h1 class="hero-title reveal">
+      <span data-i18n="hero.title1">只有你在，</span><br>
+      <span class="gradient-text" data-i18n="hero.title2">屏幕才清晰。</span>
+    </h1>
+    <p class="hero-sub reveal" data-i18n="hero.sub">离开座位，屏幕瞬间遮挡，摄像头随即关闭；回来按下 Esc，用 Touch ID 解锁。识别跑在神经网络引擎上，一次只要 0.85 毫秒。</p>
+    <div class="hero-cta reveal">
+      <a class="btn btn-primary" href="#try" data-i18n="hero.try">在浏览器里试试</a>
+      <a class="btn btn-ghost" href="#install" data-i18n="hero.install">安装到 Mac</a>
+    </div>
+
+    <div class="hero-stage reveal" id="heroStage">
+      <div class="laptop" id="heroLaptop">
+        <div class="lid">
+          <div class="bezel"><span class="notch"><i class="cam-led"></i></span>
+            <div class="screen" id="heroScreen"></div>
+          </div>
+        </div>
+        <div class="base"><span class="lip"></span></div>
+      </div>
+      <div class="hero-caption" id="heroCaption"><span class="dot"></span><span id="heroCaptionText">折叠</span></div>
+    </div>
+  </header>
+
+  <!-- STATS STRIP -->
+  <section class="strip">
+    <div class="stat reveal"><b data-count="0.85" data-decimals="2">0</b><span>ms</span><p data-i18n="strip.ane">神经网络引擎上的一次人脸识别</p></div>
+    <div class="stat reveal"><b data-count="2">0</b><span data-i18n="strip.fpsUnit">次/秒</span><p data-i18n="strip.detect">离开模式下的人脸检测频率</p></div>
+    <div class="stat reveal"><b data-count="0">0</b><span>%</span><p data-i18n="strip.cameraOff">你离开时摄像头的占用（直接关闭）</p></div>
+    <div class="stat reveal"><b data-count="5">0</b><span data-i18n="strip.faces">张</span><p data-i18n="strip.facesNote">可录入的面孔，像 Face ID 一样</p></div>
+  </section>
+
+  <!-- STORY (scrollytelling) -->
+  <section class="story" id="story">
+    <div class="story-sticky">
+      <div class="story-text">
+        <p class="eyebrow" data-i18n="story.eyebrow">一次离开，会发生什么</p>
+        <ol class="steps" id="steps">
+          <li data-step="0"><h3 data-i18n="story.s0t">你在电脑前</h3><p data-i18n="story.s0p">摄像头每秒只看两眼：画面里有没有人脸。不做身份识别，不录屏，不上传。</p></li>
+          <li data-step="1"><h3 data-i18n="story.s1t">你起身离开</h3><p data-i18n="story.s1p">连续 5 秒看不到人脸才算离开。低头看手机、转头说话都不会误触发。</p></li>
+          <li data-step="2"><h3 data-i18n="story.s2t">第一帧就盖住</h3><p data-i18n="story.s2p">先瞬间磨砂，再像折叠屏一样展开隐私面板。动画永远播放在已经遮住的画面上。</p></li>
+          <li data-step="3"><h3 data-i18n="story.s3t">摄像头随即关闭</h3><p data-i18n="story.s3p">没人需要看着空椅子。你离开多久，摄像头就省多久的电。</p></li>
+          <li data-step="4"><h3 data-i18n="story.s4t">15 秒后转为纯黑</h3><p data-i18n="story.s4p">实时磨砂会让系统持续计算模糊。没人看的时候，干脆变黑，连这部分也省下。</p></li>
+          <li data-step="5"><h3 data-i18n="story.s5t">回来，按 Esc</h3><p data-i18n="story.s5p">Touch ID 一按，面板折回成一道光，屏幕恢复如初。陌生人按 Esc？解不开。</p></li>
+        </ol>
+      </div>
+      <div class="story-visual">
+        <div class="laptop" id="storyLaptop">
+          <div class="lid">
+            <div class="bezel"><span class="notch"><i class="cam-led" id="storyLed"></i></span>
+              <div class="screen" id="storyScreen"></div>
+            </div>
+          </div>
+          <div class="base"><span class="lip"></span></div>
+        </div>
+        <div class="viewfinder" id="viewfinder">
+          <div class="vf-head">
+            <span class="rec"></span><span id="vfLabel">CAMERA · 2 fps</span>
+          </div>
+          <svg class="vf-person" id="vfPerson" viewBox="0 0 200 150" aria-hidden="true">
+            <defs><linearGradient id="pg" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#cbd5e1"/><stop offset="1" stop-color="#64748b"/></linearGradient></defs>
+            <ellipse cx="100" cy="62" rx="27" ry="33" fill="url(#pg)" opacity=".85"/>
+            <path d="M40 150 C45 108 70 98 100 98 C130 98 155 108 160 150 Z" fill="url(#pg)" opacity=".7"/>
+          </svg>
+          <div class="vf-box" id="vfBox"><span>face 0.97</span></div>
+          <div class="vf-ring" id="vfRing"><svg viewBox="0 0 44 44"><circle cx="22" cy="22" r="19"/><circle class="arc" cx="22" cy="22" r="19"/></svg><b id="vfCount">5</b></div>
+          <div class="vf-off" id="vfOff" data-i18n="story.camOff">摄像头已关闭</div>
+          <div class="keys" id="keys"><kbd>esc</kbd><span class="touchid"></span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- COVER STYLES -->
+  <section class="section" id="styles">
+    <p class="eyebrow center reveal" data-i18n="styles.eyebrow">四种遮挡效果</p>
+    <h2 class="section-title center reveal" data-i18n="styles.title">先遮住，再惊艳。</h2>
+    <p class="section-sub center reveal" data-i18n="styles.sub">每一种效果的第一帧都是不透明的。点一下卡片，看它如何盖住屏幕。</p>
+    <div class="style-grid">
+      <button class="style-card reveal spot" data-style="fold"><div class="mini"><div class="screen"></div></div><h3 data-i18n="styles.fold">折叠</h3><p data-i18n="styles.foldP">两片烟熏玻璃从中缝铰链展开，像折叠屏合上又打开。</p></button>
+      <button class="style-card reveal spot" data-style="curtain"><div class="mini"><div class="screen"></div></div><h3 data-i18n="styles.curtain">幕布</h3><p data-i18n="styles.curtainP">天鹅绒般的褶皱幕布从两侧弹性合拢。</p></button>
+      <button class="style-card reveal spot" data-style="frosted"><div class="mini"><div class="screen"></div></div><h3 data-i18n="styles.frosted">磨砂</h3><p data-i18n="styles.frostedP">系统级磨砂玻璃，由 WindowServer 合成，功耗最低。</p></button>
+      <button class="style-card reveal spot" data-style="black"><div class="mini"><div class="screen"></div></div><h3 data-i18n="styles.black">纯黑</h3><p data-i18n="styles.blackP">最干脆的一种。也是离开 15 秒后所有效果的归宿。</p></button>
+    </div>
+  </section>
+
+  <!-- POWER -->
+  <section class="section" id="power">
+    <p class="eyebrow center reveal" data-i18n="power.eyebrow">实测 · MacBook Air M4</p>
+    <h2 class="section-title center reveal" data-i18n="power.title">真正耗电的，是摄像头。</h2>
+    <p class="section-sub center reveal" data-i18n="power.sub">AI 本身很省：小模型加专用芯片。所以我们把力气花在少开摄像头、少唤醒、少渲染上。</p>
+    <div class="power-table reveal" id="powerTable">
+      <div class="power-row" data-before="30" data-after="15" data-max="30" data-unit="fps">
+        <div class="pr-label"><b data-i18n="power.fps">摄像头帧率</b><span data-i18n="power.fpsNote">原版想限到 10 fps，被只支持 15–30 的摄像头拒绝了</span></div>
+        <div class="pr-bars"><i class="before"></i><i class="after"></i></div><div class="pr-val"></div>
+      </div>
+      <div class="power-row" data-before="21" data-after="10" data-max="30" data-unit="%">
+        <div class="pr-label"><b data-i18n="power.cam">系统摄像头进程 CPU</b><span>cameracaptured</span></div>
+        <div class="pr-bars"><i class="before"></i><i class="after"></i></div><div class="pr-val"></div>
+      </div>
+      <div class="power-row" data-before="4.5" data-after="0.85" data-max="5" data-unit="ms" data-decimals="2">
+        <div class="pr-label"><b data-i18n="power.sface">一次人脸识别</b><span data-i18n="power.sfaceNote">CPU → 神经网络引擎，特征余弦相似度 &gt; 0.999</span></div>
+        <div class="pr-bars"><i class="before"></i><i class="after"></i></div><div class="pr-val"></div>
+      </div>
+      <div class="power-row" data-before="30" data-after="0" data-max="30" data-unit="fps">
+        <div class="pr-label"><b data-i18n="power.rec">监测时的后台录屏</b><span data-i18n="power.recNote">原版一直以全分辨率录屏备着模糊图</span></div>
+        <div class="pr-bars"><i class="before"></i><i class="after"></i></div><div class="pr-val"></div>
+      </div>
+      <div class="power-row" data-before="29" data-after="1" data-max="30" data-unit="%">
+        <div class="pr-label"><b data-i18n="power.idle">头部追踪时 App 的 CPU</b><span data-i18n="power.idleNote">不再每帧重绘界面</span></div>
+        <div class="pr-bars"><i class="before"></i><i class="after"></i></div><div class="pr-val"></div>
+      </div>
+      <div class="legend"><span><i class="before"></i>QuietGlass 0.1.2</span><span><i class="after"></i>QuietGlass Plus</span></div>
+    </div>
+  </section>
+
+  <!-- FACES -->
+  <section class="section split" id="faces">
+    <div class="split-text">
+      <p class="eyebrow reveal" data-i18n="faces.eyebrow">像 Face ID 一样</p>
+      <h2 class="section-title reveal" data-i18n="faces.title">录入你，也录入你信任的人。</h2>
+      <p class="section-sub reveal" data-i18n="faces.sub">最多 5 张面孔：你、戴眼镜的你、家人。已保存的人坐在身边不算旁观者。面孔只以 128 维模板的形式加密存放在本机钥匙串里，从不保存照片。</p>
+      <div class="chips reveal"><span class="chip on">我</span><span class="chip on" data-i18n="faces.glasses">戴眼镜的我</span><span class="chip on" data-i18n="faces.family">家人</span><span class="chip add">+</span></div>
+      <ul class="ticks reveal">
+        <li data-i18n="faces.t1">识别模型 SFace，跑在 Apple 神经网络引擎上</li>
+        <li data-i18n="faces.t2">解锁 Mac 后直接清晰，不必再用一次 Touch ID</li>
+        <li data-i18n="faces.t3">可选：恢复时轻轻转头，让照片骗不过去</li>
+      </ul>
+    </div>
+    <div class="split-visual reveal"><canvas id="faceMesh" width="560" height="560" aria-hidden="true"></canvas><div class="scan"></div></div>
+  </section>
+
+  <!-- EARBUDS -->
+  <section class="section split reverse" id="earbuds">
+    <div class="split-text">
+      <p class="eyebrow reveal" data-i18n="ear.eyebrow">不止 AirPods</p>
+      <h2 class="section-title reveal" data-i18n="ear.title">你的耳机，也是一枚传感器。</h2>
+      <p class="section-sub reveal" data-i18n="ear.sub">Sony WF-1000XM6 通过蓝牙 HID 暴露了 Android 标准的头部追踪协议。我们直接读取，每秒 25 次；你一转头，屏幕就遮住，全程不需要摄像头。</p>
+      <div class="readout reveal">
+        <div><span>yaw</span><b id="yawVal">0°</b></div>
+        <div><span>pitch</span><b id="pitchVal">0°</b></div>
+        <div><span data-i18n="ear.state">屏幕</span><b id="earState" class="is-clear" data-i18n="ear.clear">清晰</b></div>
+      </div>
+      <p class="fine reveal" data-i18n="ear.note">回放的是真实录到的 WF-1000XM6 数据片段：参考系拼接、12 秒预热、耳塞 45° 倾斜补偿之后的结果。</p>
+    </div>
+    <div class="split-visual reveal"><canvas id="headCanvas" width="560" height="560" aria-hidden="true"></canvas></div>
+  </section>
+
+  <!-- TRY -->
+  <section class="section" id="try">
+    <p class="eyebrow center reveal" data-i18n="try.eyebrow">现场演示</p>
+    <h2 class="section-title center reveal" data-i18n="try.title">现在就离开一下试试。</h2>
+    <p class="section-sub center reveal" data-i18n="try.sub">打开摄像头后，人脸检测在你的浏览器里本地运行。离开 3 秒，下面这块“屏幕”就会遮住；回来按 Esc 解锁。</p>
+    <div class="try-wrap reveal">
+      <div class="try-screen">
+        <div class="laptop compact"><div class="lid"><div class="bezel"><span class="notch"><i class="cam-led" id="tryLed"></i></span><div class="screen" id="tryScreen"></div></div></div><div class="base"><span class="lip"></span></div></div>
+      </div>
+      <div class="try-panel">
+        <div class="try-video"><video id="tryVideo" playsinline muted></video><div class="vf-box" id="tryBox"></div><div class="try-placeholder" id="tryPlaceholder" data-i18n="try.placeholder">摄像头未开启</div></div>
+        <p class="try-status" id="tryStatus" data-i18n="try.idle">准备就绪</p>
+        <div class="try-buttons">
+          <button class="btn btn-primary" id="tryStart" data-i18n="try.start">打开摄像头</button>
+          <button class="btn btn-ghost" id="trySim" data-i18n="try.sim">没有摄像头？模拟离开</button>
+        </div>
+        <p class="fine" data-i18n="try.privacy">画面不会离开你的浏览器。模型来自 Google MediaPipe（首次加载约 1 MB）。关闭页面即停止。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- HONEST -->
+  <section class="section" id="honest">
+    <h2 class="section-title center reveal" data-i18n="honest.title">我们也想诚实地告诉你。</h2>
+    <div class="honest-grid">
+      <div class="honest reveal spot"><h3 data-i18n="honest.h1">遮罩不是锁屏</h3><p data-i18n="honest.p1">App 崩溃时遮罩会消失，其他程序也可能读取屏幕。离开久了，让它替你锁上 Mac。</p></div>
+      <div class="honest reveal spot"><h3 data-i18n="honest.h2">普通摄像头不是 Face ID</h3><p data-i18n="honest.p2">RGB 摄像头无法证明活体。转头确认只是提高门槛，所以离开模式默认用 Touch ID 解锁。</p></div>
+      <div class="honest reveal spot"><h3 data-i18n="honest.h3">只看得见镜头里的人</h3><p data-i18n="honest.p3">站在摄像头视野外的人看不到。坐在咖啡馆角落，更好的位置比任何算法都管用。</p></div>
+    </div>
+  </section>
+
+  <!-- INSTALL -->
+  <section class="section" id="install">
+    <p class="eyebrow center reveal" data-i18n="install.eyebrow">开源 · MIT</p>
+    <h2 class="section-title center reveal" data-i18n="install.title">三行命令，装进你的 Mac。</h2>
+    <div class="code reveal spot">
+      <button class="copy" id="copy" data-i18n="install.copy">复制</button>
+<pre id="code"><span class="c"># macOS 14+，Xcode 26+</span>
+git clone https://github.com/Functionhx/quietglass-plus.git && cd quietglass-plus
+scripts/setup-isolated-signing.sh && bash build.sh "$PWD/dist/QuietGlass.app"
+ditto dist/QuietGlass.app /Applications/QuietGlass.app && open -a QuietGlass</pre>
+    </div>
+    <p class="section-sub center reveal" data-i18n="install.after">打开后：设置 → 保护 → 打开“摄像头自动保护”。默认就是“离开时遮挡，回来按键解锁”。</p>
+    <div class="hero-cta center reveal"><a class="btn btn-primary" href="https://github.com/Functionhx/quietglass-plus" data-i18n="install.github">在 GitHub 上查看</a></div>
+  </section>
+
+  <footer class="footer">
+    <p data-i18n="footer.credit">基于 Clinton Imaro 的 <a href="https://github.com/clintonimaroo/quietglass">QuietGlass</a> 改造 · SFace 模型 Apache 2.0 · MIT License</p>
+    <p class="fine" data-i18n="footer.power">这个页面也省电：滚出视口的动画会暂停，并遵循系统的“减少动态效果”。</p>
+  </footer>
+
+  <script src="main.js" type="module"></script>
+</body>
+</html>
