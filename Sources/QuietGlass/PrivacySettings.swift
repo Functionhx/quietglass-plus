@@ -554,7 +554,7 @@ private struct PrivacySettingsView: View {
             }
             divider
             row("Protection mode", detail: model.protectionMode == .away
-                ? "Only face detection runs while you work, and the camera turns off once the screen is covered. Press Esc to unlock when you are back."
+                ? "Only face detection runs while you work, and the camera turns off once the screen is covered. When you are back, press any key (Touch ID after the time limit)."
                 : "Covers when you leave or another face appears, and clears when it recognizes a saved face.") {
                 Picker("Protection mode", selection: $model.protectionMode) {
                     ForEach(ProtectionMode.allCases) { Text(verbatim: $0.title).tag($0) }
@@ -564,7 +564,7 @@ private struct PrivacySettingsView: View {
                 .disabled(model.nearby.owner.busy || model.nearby.owner.enrolling)
             }
             divider
-            row("Detect additional faces", detail: "Uses your camera while you work. AirPods are not required.") {
+            row("Detect additional faces", detail: model.protectionMode == .away ? "Master switch: the camera watches for you leaving and covers the screen." : "Uses your camera while you work. AirPods are not required.") {
                 Toggle("Nearby people", isOn: Binding(get: { model.cameraProtectionOn }, set: { model.setCameraProtection($0) }))
                     .labelsHidden()
                     .disabled(model.nearby.owner.busy || model.nearby.owner.enrolling)
@@ -574,6 +574,18 @@ private struct PrivacySettingsView: View {
                 row("Cover after I leave for", detail: "Looking down or away briefly does not count.") {
                     Picker("Cover after I leave for", selection: Binding(get: { model.away.delay }, set: { model.away.delay = $0 })) {
                         ForEach([3.0, 5, 10, 30], id: \.self) { Text(LF("%d seconds", Int($0))).tag($0) }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                }
+                divider
+                row("Any key unlocks for", detail: "Right after the screen covers, any key unlocks it. After this time, unlocking needs Touch ID or your Mac password.") {
+                    Picker("Any key unlocks for", selection: Binding(get: { model.away.graceSeconds }, set: { model.away.graceSeconds = $0 })) {
+                        Text("Off").tag(0.0)
+                        Text(LF("%d seconds", 30)).tag(30.0)
+                        Text(LF("%d min", 1)).tag(60.0)
+                        Text(LF("%d min", 2)).tag(120.0)
+                        Text(LF("%d min", 5)).tag(300.0)
                     }
                     .labelsHidden()
                     .fixedSize()

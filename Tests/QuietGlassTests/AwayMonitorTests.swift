@@ -56,6 +56,23 @@ private final class FakeCamera: NearbyCameraSession {
         XCTAssertTrue(cameras[1].started)
     }
 
+    func testAnyKeyGraceStartsWhenCoveredAndCanBeTurnedOff() async throws {
+        try XCTSkipIf(AVCaptureAuthorization.denied, "camera access denied for the test runner")
+        let monitor = makeMonitor()
+        XCTAssertEqual(monitor.graceSeconds, 60, "Default: any key unlocks for the first minute")
+        monitor.setEnabled(true)
+        await wait { !self.cameras.isEmpty }
+        XCTAssertFalse(monitor.withinGrace, "No grace before covering")
+        for _ in 0..<12 { await send(faces: 0) }
+        XCTAssertTrue(monitor.covered)
+        XCTAssertTrue(monitor.withinGrace)
+        XCTAssertEqual(monitor.graceRemaining ?? 0, 60, accuracy: 1)
+        monitor.graceSeconds = 0
+        XCTAssertFalse(monitor.withinGrace, "Off: always Touch ID")
+        monitor.unlock()
+        XCTAssertNil(monitor.coveredAt)
+    }
+
     func testScreenUnlockClearsAnAwayCover() async throws {
         try XCTSkipIf(AVCaptureAuthorization.denied, "camera access denied for the test runner")
         let monitor = makeMonitor()

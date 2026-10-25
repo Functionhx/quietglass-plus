@@ -129,6 +129,7 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
     private var observers: [NSObjectProtocol] = []
     private var distributedObservers: [NSObjectProtocol] = []
     private var absentSince: Date?
+    private var graceTimer: Timer?
     private var autoLockTimer: Timer?
     private var keyCode: UInt32
     private var keyModifiers: UInt32
@@ -396,17 +397,32 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         updateAutoLock()
         // "Away" always uses the capture-free cover: the camera is off, nothing else runs.
         let wanted = away.covered || (!coverStyle.usesScreenCapture && (nearby.covered || demoCovered || headCovered))
-        guard wanted else { cover.hide(); refreshEscape(); return }
+        guard wanted else { cover.hide(); graceTimer?.invalidate(); graceTimer = nil; refreshEscape(); return }
         let title = away.covered ? L("You stepped away") : nearby.covered ? nearby.noticeTitle : headCovered ? L("Looking away") : L("Protection check")
-        let detail = away.covered ? L("Press Esc to unlock") : nearby.owner.enabled && nearby.covered ? String(localized: "Look at the camera to unlock") : ""
+        let detail = away.covered
+            ? (away.withinGrace || !away.unlockRequiresAuthentication ? L("Press any key to unlock") : L("Press Esc to unlock with Touch ID"))
+            : nearby.owner.enabled && nearby.covered ? String(localized: "Look at the camera to unlock") : ""
         if cover.badge.title != title { cover.badge.title = title }
         if cover.badge.detail != detail { cover.badge.detail = detail }
-        let canUnlock = away.covered ? away.unlockRequiresAuthentication : nearby.owner.enabled && nearby.covered
+        let canUnlock = away.covered ? away.unlockRequiresAuthentication && !away.withinGrace : nearby.owner.enabled && nearby.covered
+        cover.badge.exitTitle = away.covered ? "Unlock" : "Exit blur"
         if cover.badge.canUnlock != canUnlock { cover.badge.canUnlock = canUnlock }
         if cover.badge.canExit != !canUnlock { cover.badge.canExit = !canUnlock }
         cover.show(style: coverStyle == .glass ? .fold : coverStyle)
         // Away: nobody is watching and the camera is off; stop the live blur too.
         cover.fadeToBlack(after: away.covered ? 15 : nil)
+        if away.covered {
+            cover.captureKeyboard()
+            // Switch the prompt to Touch ID when the any-key window ends.
+            graceTimer?.invalidate(); graceTimer = nil
+            if let remaining = away.graceRemaining {
+                let timer = Timer(timeInterval: remaining + 0.1, repeats: false) { [weak self] _ in
+                    Task { @MainActor in self?.updateCover() }
+                }
+                graceTimer = timer
+                RunLoop.main.add(timer, forMode: .common)
+            }
+        }
         refreshEscape()
     }
 
@@ -424,7 +440,7 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
     /// Back at the Mac: Escape or the cover's button, then Touch ID if required.
     func unlockAway() {
         guard away.covered else { return }
-        if away.unlockRequiresAuthentication { authenticateThen("Unlock your screen.") { $0.away.unlock() } }
+        if away.unlockRequiresAuthentication && !away.withinGrace { authenticateThen("Unlock your screen.") { $0.away.unlock() } }
         else { away.unlock() }
     }
 

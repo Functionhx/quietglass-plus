@@ -33,6 +33,21 @@ final class AwayMonitor: ObservableObject {
     @Published var unlockRequiresAuthentication: Bool {
         didSet { preferences.set(unlockRequiresAuthentication, forKey: "awayUnlockRequiresAuth") }
     }
+    /// Within this many seconds of covering, any key unlocks without Touch ID (0 = never),
+    /// like macOS's "require password after screen saver begins".
+    @Published var graceSeconds: TimeInterval {
+        didSet { preferences.set(graceSeconds, forKey: "awayGrace") }
+    }
+    /// Wall-clock time, so a Mac that slept while covered does not stay inside the grace period.
+    private(set) var coveredAt: Date?
+    var withinGrace: Bool {
+        guard let coveredAt, graceSeconds > 0 else { return false }
+        return Date().timeIntervalSince(coveredAt) < graceSeconds
+    }
+    var graceRemaining: TimeInterval? {
+        guard let coveredAt, withinGrace else { return nil }
+        return graceSeconds - Date().timeIntervalSince(coveredAt)
+    }
     var onCoverage: ((Bool) -> Void)?
 
     private let preferences: UserDefaults
@@ -54,6 +69,7 @@ final class AwayMonitor: ObservableObject {
         self.delay = delay
         policy = AwayPolicy(delay: delay)
         unlockRequiresAuthentication = preferences.object(forKey: "awayUnlockRequiresAuth") as? Bool ?? true
+        graceSeconds = preferences.object(forKey: "awayGrace") as? Double ?? 60
         wantsMonitoring = preferences.bool(forKey: "awayEnabled")
     }
 
@@ -154,6 +170,7 @@ final class AwayMonitor: ObservableObject {
 
     private func setCovered(_ value: Bool) {
         guard covered != value else { return }
+        coveredAt = value ? Date() : nil
         covered = value
         onCoverage?(value)
     }

@@ -36,6 +36,7 @@ final class CoverBadgeModel: ObservableObject {
     @Published var canUnlock = false
     /// Shown when no authentication is needed to clear (looking away, no Recognize me).
     @Published var canExit = false
+    @Published var exitTitle: LocalizedStringKey = "Exit blur"
     var onUnlock: (() -> Void)?
     var onExit: (() -> Void)?
 }
@@ -62,7 +63,7 @@ private struct CoverBadge: View {
             }
             if model.canUnlock || model.canExit {
                 Button { model.canUnlock ? model.onUnlock?() : model.onExit?() } label: {
-                    Label(model.canUnlock ? "Unlock with Touch ID" : "Exit blur", systemImage: model.canUnlock ? "touchid" : "xmark.circle")
+                    Label(model.canUnlock ? "Unlock with Touch ID" : model.exitTitle, systemImage: model.canUnlock ? "touchid" : "xmark.circle")
                         .font(.system(size: 13, weight: .medium))
                         .padding(.horizontal, 14).padding(.vertical, 7)
                 }
@@ -437,6 +438,17 @@ final class PrivacyCover {
             keepAlive = timer
             RunLoop.main.add(timer, forMode: .common)
         }
+    }
+
+    /// Makes the main display's cover the key window without activating the app, so
+    /// keystrokes reach QuietGlass (any-key unlock) instead of the hidden apps. No
+    /// Input Monitoring permission is needed for this.
+    func captureKeyboard() {
+        guard isCovered, let primary = NSScreen.screens.first,
+              let id = (primary.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value,
+              let panel = surfaces[id]?.panel else { return }
+        panel.becomesKeyOnlyIfNeeded = false
+        panel.makeKey()
     }
 
     func hide(animated: Bool = true) {

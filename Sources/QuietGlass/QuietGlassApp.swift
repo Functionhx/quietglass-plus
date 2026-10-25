@@ -138,6 +138,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
+            // Away cover holds keyboard focus: any key is an unlock attempt and never
+            // reaches the hidden apps.
+            if self.model.away.covered {
+                self.model.unlockAway()
+                return nil
+            }
             if self.model.recordingShortcut {
                 self.model.recordShortcut(event)
                 return nil
@@ -165,6 +171,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         model.nearby.restore()
         model.away.restore()
+        // Documentation screenshots: open straight to camera protection.
+        if CommandLine.arguments.contains("--show-nearby-settings") {
+            privacySettings.show()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in self?.privacySettings.showNearbyPeople() }
+        }
         model.updates.checkIfDue()
     }
 

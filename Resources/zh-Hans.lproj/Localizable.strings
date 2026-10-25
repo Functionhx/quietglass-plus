@@ -5,6 +5,7 @@
 " · Screen stays protected" = " · 屏幕保持保护";
 " · Try again" = " · 请重试";
 "%d faces in view" = "画面中有 %d 个人";
+"%d min" = "%d 分钟";
 "%d of 4 directions checked" = "已检查 %d/4 个方向";
 "%d seconds" = "%d 秒";
 ". Check the camera and try again." = "。请检查摄像头后重试。";
@@ -46,6 +47,7 @@
 "Another app reserved Escape. Pause that shortcut and try again." = "其他 App 占用了 Esc，请暂停该快捷键后重试。";
 "Another app reserved Escape. Release that shortcut before shielding." = "其他 App 占用了 Esc，请先释放该快捷键再启用遮挡。";
 "Any extra face" = "任何多余面孔";
+"Any key unlocks for" = "任意键解锁时限";
 "Anyone saved here can clear protection. Stored in this Mac’s Keychain; Touch ID or your Mac password is required to add, delete or use them." = "这里保存的任何人都能解除保护。数据存放在本机钥匙串中；添加、删除或使用都需要 Touch ID 或 Mac 密码。";
 "App protection" = "App 保护";
 "App rules" = "App 规则";
@@ -330,6 +332,7 @@
 "Looking away · Screen protected" = "视线已移开 · 屏幕已保护";
 "Looking down or away briefly does not count." = "短暂低头或转开视线不算离开。";
 "Lowest blur strength" = "最低模糊强度";
+"Master switch: the camera watches for you leaving and covers the screen." = "总开关：开启后用摄像头判断你是否离开，并自动遮挡。";
 "Maximum 24 hours" = "最多 24 小时";
 "Me" = "我";
 "Min." = "分钟";
@@ -367,7 +370,7 @@
 "Office" = "办公室";
 "On your Mac. No images saved." = "在本机处理，不保存图像。";
 "One face in view" = "画面中有一个人";
-"Only face detection runs while you work, and the camera turns off once the screen is covered. Press Esc to unlock when you are back." = "工作时只做最简单的人脸检测，屏幕一被遮挡就关闭摄像头。回来后按 Esc 解锁。最省电。";
+"Only face detection runs while you work, and the camera turns off once the screen is covered. When you are back, press any key (Touch ID after the time limit)." = "工作时只做最简单的人脸检测，屏幕一被遮挡就关闭摄像头。回来按任意键解锁（超过时限需 Touch ID）。最省电。";
 "Only faces inside the camera’s view can be detected." = "只能检测到摄像头视野内的面孔。";
 "Only people inside the camera’s view can be detected. Nearby monitoring pauses during a test and resumes when you close this check. Your saved warning delay stays unchanged. This checks coverage, not your identity." = "只能检测到摄像头视野内的人。测试期间“附近有人”监测会暂停，关闭测试后恢复。你保存的提醒设置不会改变。";
 "Only your face should be in view" = "画面中只能有你一个人";
@@ -408,7 +411,9 @@
 "Preparing blur · Esc to clear" = "正在准备模糊 · 按 Esc 清除";
 "Preparing privacy blur" = "正在准备隐私模糊";
 "Press Esc to unlock" = "按 Esc 解锁";
+"Press Esc to unlock with Touch ID" = "按 Esc，用 Touch ID 解锁";
 "Press again to clear. Escape clears all protection." = "再按一次清除。Esc 会清除所有保护。";
+"Press any key to unlock" = "按任意键解锁";
 "Press keys…" = "请按下按键…";
 "Preview Blur for 5 Seconds" = "预览模糊 5 秒";
 "Preview blur" = "预览模糊";
@@ -497,6 +502,7 @@
 "Return" = "回车";
 "Review the suggested angle before applying it." = "应用前请先查看建议角度。";
 "Right" = "右侧";
+"Right after the screen covers, any key unlocks it. After this time, unlocking needs Touch ID or your Mac password." = "遮挡后这段时间内按任意键即可解锁；超过之后，需要 Touch ID 或 Mac 密码。";
 "Run check" = "开始测试";
 "Same as System" = "跟随系统";
 "Sample blur preview" = "模糊效果示例";
@@ -610,6 +616,7 @@
 "Turn slowly and hold for a moment. The ring fills as your AirPods detect each direction." = "慢慢转头并稍作停留，AirPods 检测到每个方向时圆环会填满。";
 "Turn until the sample begins to blur" = "转头直到示例开始模糊";
 "Undo" = "撤销";
+"Unlock" = "解锁";
 "Unlock with Touch ID" = "用 Touch ID 解锁";
 "Unlock your saved face to continue" = "解锁已保存的面孔以继续";
 "Unlock your screen." = "解锁屏幕。";
