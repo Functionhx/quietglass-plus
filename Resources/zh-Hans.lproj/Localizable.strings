@@ -29,6 +29,7 @@
 "AirPods disconnected. Face the screen and recenter after reconnecting." = "AirPods 已断开，重新连接后请面向屏幕并重新居中。";
 "AirPods disconnected. Reconnect and try again." = "AirPods 已断开，请重新连接后再试。";
 "AirPods motion · On your Mac · No camera" = "AirPods 运动数据 · 本机处理 · 不用摄像头";
+"Alert me" = "提醒我";
 "All apps use your standard sensitivity. Add an app to give it its own behavior." = "所有 App 都使用标准灵敏度。添加 App 可为它单独设置行为。";
 "All directions checked" = "所有方向均已检查";
 "All four directions are checked. Next, let’s find your comfortable range." = "四个方向都已检查。接下来找到你的舒适范围。";
@@ -84,6 +85,7 @@
 "Blur starts in %d seconds." = "%d 秒后开始模糊。";
 "Blur stays on · Esc to stop" = "模糊保持开启 · 按 Esc 停止";
 "Blur strength" = "模糊强度";
+"Blur until they look away" = "自动模糊，移开视线后恢复";
 "Blurred" = "已模糊";
 "Blurs every display when another face appears or your saved face needs verification. Escape clears it and stops the camera." = "出现其他面孔或需要验证本人时遮挡所有显示器。按 Esc 清除并停止摄像头（开启“识别我”时需验证身份）。";
 "Blurs for 3 seconds, then clears." = "模糊 3 秒后清除。";
@@ -163,6 +165,7 @@
 "Clear privacy shield" = "清除隐私遮挡";
 "Clear screen" = "清除屏幕遮挡";
 "Clear selected areas" = "清除所选区域";
+"Clears when they look away" = "对方移开视线后自动恢复";
 "Click Center, then face this display within three seconds." = "点按“居中”，然后在三秒内面向这台显示器。";
 "Close controls" = "关闭控制";
 "Close protection check" = "关闭保护测试";
@@ -305,6 +308,8 @@
 "Keep your screen blurred until you clear it. AirPods are not required." = "保持屏幕模糊直到你手动清除，无需 AirPods。";
 "Keychain could not securely access your face data. Try again after unlocking your Mac." = "钥匙串无法安全访问面孔数据，请解锁 Mac 后重试。";
 "Language" = "语言";
+"Last cover: nobody seen for %d s" = "上次遮挡：%d 秒没有检测到人";
+"Last cover: the camera stopped sending frames" = "上次遮挡：摄像头停止输出画面";
 "Launch at login" = "登录时启动";
 "Learn for 8 seconds" = "学习 8 秒";
 "Learn your normal movement" = "学习你的日常动作";
@@ -313,6 +318,7 @@
 "Learning…" = "正在学习…";
 "Left" = "左侧";
 "Let’s try that again" = "再试一次";
+"Like Honor phones: when someone else faces your screen, warn you or blur until they look away." = "类似荣耀手机：有其他人面朝你的屏幕时提醒你，或者自动模糊直到对方移开视线。";
 "Live camera coverage" = "实时摄像头覆盖范围";
 "Live camera preview of your face" = "你的面孔实时预览";
 "Live head position" = "实时头部位置";
@@ -402,6 +408,7 @@
 "Paused while your Mac is inactive" = "Mac 不活跃时已暂停";
 "Paused · Resumes in %d:%02d" = "已暂停 · %d:%02d 后恢复";
 "Payment card numbers" = "银行卡号";
+"Peek alert" = "偷窥提醒";
 "Peeking at your screen" = "正在偷看屏幕";
 "Per-display head tracking" = "分屏头部追踪";
 "Phrases to protect" = "要保护的短语";
@@ -555,6 +562,7 @@
 "Small movements stay clear. Turn past %d° to cover the screen." = "小幅动作不会触发，转头超过 %d° 将遮挡屏幕。";
 "Smaller angles respond to smaller turns." = "角度越小，对小幅转头越敏感。";
 "Solid black." = "纯黑遮挡。";
+"Someone is looking at your screen" = "有人在看你的屏幕";
 "Sony & other earbuds" = "Sony 等耳机";
 "Space" = "空格";
 "Standard" = "标准";

@@ -579,6 +579,14 @@ private struct PrivacySettingsView: View {
                     .fixedSize()
                 }
                 divider
+                row("Peek alert", detail: "Like Honor phones: when someone else faces your screen, warn you or blur until they look away.") {
+                    Picker("Peek alert", selection: Binding(get: { model.away.peekResponse }, set: { model.away.peekResponse = $0 })) {
+                        ForEach(PeekResponse.allCases) { Text(verbatim: $0.title).tag($0) }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                }
+                divider
                 row("Any key unlocks for", detail: "Right after the screen covers, any key unlocks it. After this time, unlocking needs Touch ID or your Mac password.") {
                     Picker("Any key unlocks for", selection: Binding(get: { model.away.graceSeconds }, set: { model.away.graceSeconds = $0 })) {
                         Text("Off").tag(0.0)
@@ -613,7 +621,7 @@ private struct PrivacySettingsView: View {
                 }
                 if model.away.wantsMonitoring {
                     divider
-                    row(model.away.status) { EmptyView() }
+                    row(model.away.status, detail: model.away.lastCoverNote) { EmptyView() }
                 }
             } else {
             divider

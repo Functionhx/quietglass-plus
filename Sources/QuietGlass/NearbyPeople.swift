@@ -57,6 +57,9 @@ struct NearbyFaceSample {
     var bounds: [CGRect] = []
     var faces: [CameraFace]? = nil
     var identities: [CameraIdentity?] = []
+    /// "Is someone there", when presence detection is on: faces at a lower confidence.
+    /// (Vision's upper-body detector found nobody at laptop distance in testing.)
+    var people: Int? = nil
 }
 
 struct CameraIdentity {
@@ -75,6 +78,8 @@ protocol NearbyCameraSession: AnyObject {
     func start()
     func stop()
     func configureRecognition(_ enabled: Bool)
+    /// Also detect upper bodies and low-confidence faces, for "is anyone there".
+    func configurePresence(_ enabled: Bool)
     func configureDevice(_ id: String?)
     /// Requested face analyses per second. Shared cameras run at the fastest client's rate.
     func configureRate(_ analysesPerSecond: Double)
@@ -83,6 +88,7 @@ protocol NearbyCameraSession: AnyObject {
 extension NearbyCameraSession {
     var previewSession: AVCaptureSession? { nil }
     func configureRecognition(_ enabled: Bool) {}
+    func configurePresence(_ enabled: Bool) {}
     func configureDevice(_ id: String?) {}
     func configureRate(_ analysesPerSecond: Double) {}
 }
@@ -693,6 +699,7 @@ final class FaceCamera: NSObject, NearbyCameraSession, AVCaptureVideoDataOutputS
     private var observers: [NSObjectProtocol] = []
     private var analysisFailures = 0
     private var recognition = false
+    private var presence = false
     private var recognizer: OwnerFaceModel?
     private var deviceID: String?
 
@@ -711,6 +718,7 @@ final class FaceCamera: NSObject, NearbyCameraSession, AVCaptureVideoDataOutputS
         }
     }
     func configureDevice(_ id: String?) { queue.async { [self] in deviceID = id } }
+    func configurePresence(_ enabled: Bool) { queue.async { [self] in presence = enabled } }
     func configureRate(_ analysesPerSecond: Double) {
         queue.async { [self] in
             guard analysesPerSecond > 0 else { return }
@@ -810,15 +818,19 @@ final class FaceCamera: NSObject, NearbyCameraSession, AVCaptureVideoDataOutputS
         do {
             let sample = try autoreleasepool {
                 let faces: [VNFaceObservation]
+                var people: Int?
                 if recognition {
                     faces = try OwnerFaceDetector.observations(in: buffer)
                 } else {
                     let request = VNDetectFaceRectanglesRequest()
                     request.revision = VNDetectFaceRectanglesRequestRevision3
                     try VNImageRequestHandler(cvPixelBuffer: buffer, orientation: .up, options: [:]).perform([request])
-                    faces = (request.results ?? []).filter { $0.confidence >= 0.6 }
+                    let all = request.results ?? []
+                    faces = all.filter { $0.confidence >= 0.6 }
+                    if presence { people = all.filter { $0.confidence >= 0.3 }.count }
                 }
                 var sample = NearbyFaceSample(count: faces.count, capturedAt: now, bounds: faces.map(\.boundingBox))
+                sample.people = people
                 sample.faces = faces.map { CameraFace(bounds: $0.boundingBox, yaw: $0.yaw?.doubleValue, pitch: $0.pitch?.doubleValue) }
                 if recognition {
                     guard let recognizer else { throw OwnerModelError.unavailable }

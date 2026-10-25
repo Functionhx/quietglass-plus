@@ -9,6 +9,16 @@ struct QuietGlassApp {
     @MainActor static func main() {
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)
+        if CommandLine.arguments.contains("--preview-peek") {
+            // Development aid: show the peek alert pill for a few seconds.
+            let alert = PeekAlert()
+            alert.includeInCaptures = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { alert.show() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) { alert.hide() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) { exit(0) }
+            withExtendedLifetime(alert) { app.run() }
+            return
+        }
         if CommandLine.arguments.contains("--headphone-check") {
             // Development aid: voice-guided check of HID earbud head tracking.
             let check = HeadphoneCheck()

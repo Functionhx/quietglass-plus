@@ -129,6 +129,10 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
     private var observers: [NSObjectProtocol] = []
     private var distributedObservers: [NSObjectProtocol] = []
     private var absentSince: Date?
+    private let peekAlert = PeekAlert()
+    /// "Blur until they look away" is showing; Exit suppresses it for a minute.
+    private var peekCovered = false
+    private var peekSuppressedUntil = Date.distantPast
     private var graceTimer: Timer?
     private var autoLockTimer: Timer?
     private var keyCode: UInt32
@@ -220,9 +224,12 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         }
         cover.badge.onExit = { [weak self] in
             guard let self else { return }
-            if self.away.covered { self.unlockAway() } else { self.dismissShield() }
+            if self.away.covered { self.unlockAway() }
+            else if self.peekCovered { self.peekSuppressedUntil = Date().addingTimeInterval(60); self.updateOnlooker(false) }
+            else { self.dismissShield() }
         }
         away.onCoverage = { [weak self] _ in self?.updateCover() }
+        away.onOnlooker = { [weak self] watching in self?.updateOnlooker(watching) }
         awayObservation = away.objectWillChange.receive(on: RunLoop.main).sink { [weak self] _ in
             self?.objectWillChange.send()
             self?.refreshEscape()
@@ -396,11 +403,12 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
     func updateCover() {
         updateAutoLock()
         // "Away" always uses the capture-free cover: the camera is off, nothing else runs.
-        let wanted = away.covered || (!coverStyle.usesScreenCapture && (nearby.covered || demoCovered || headCovered))
+        let wanted = away.covered || peekCovered || (!coverStyle.usesScreenCapture && (nearby.covered || demoCovered || headCovered))
         guard wanted else { cover.hide(); graceTimer?.invalidate(); graceTimer = nil; refreshEscape(); return }
-        let title = away.covered ? L("You stepped away") : nearby.covered ? nearby.noticeTitle : headCovered ? L("Looking away") : L("Protection check")
+        let title = away.covered ? L("You stepped away") : peekCovered ? L("Someone is looking at your screen") : nearby.covered ? nearby.noticeTitle : headCovered ? L("Looking away") : L("Protection check")
         let detail = away.covered
             ? (away.withinGrace || !away.unlockRequiresAuthentication ? L("Press any key to unlock") : L("Press Esc to unlock with Touch ID"))
+            : peekCovered ? L("Clears when they look away")
             : nearby.owner.enabled && nearby.covered ? String(localized: "Look at the camera to unlock") : ""
         if cover.badge.title != title { cover.badge.title = title }
         if cover.badge.detail != detail { cover.badge.detail = detail }
@@ -424,6 +432,15 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
             }
         }
         refreshEscape()
+    }
+
+    /// Someone else faces the screen in away mode: warn with a pill, or blur until
+    /// they look away. The away cover itself takes precedence.
+    private func updateOnlooker(_ watching: Bool) {
+        let active = watching && !away.covered && Date() >= peekSuppressedUntil
+        if active && away.peekResponse == .alert { peekAlert.show() } else { peekAlert.hide() }
+        let blur = active && away.peekResponse == .blur
+        if peekCovered != blur { peekCovered = blur; updateCover() }
     }
 
     /// Master switch for camera protection in the current mode.

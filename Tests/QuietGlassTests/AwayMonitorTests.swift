@@ -73,6 +73,44 @@ private final class FakeCamera: NearbyCameraSession {
         XCTAssertNil(monitor.coveredAt)
     }
 
+    private func send(faces: [CameraFace], advance: Double = 0.25) async {
+        now += advance
+        cameras.last!.completion(.success(NearbyFaceSample(count: faces.count, capturedAt: now, faces: faces)))
+        for _ in 0..<10 { await Task.yield() }
+    }
+
+    func testSomeoneFacingTheScreenRaisesAPeekAlertThatClearsWhenTheyLeave() async throws {
+        try XCTSkipIf(AVCaptureAuthorization.denied, "camera access denied for the test runner")
+        let monitor = makeMonitor()
+        var events: [Bool] = []
+        monitor.onOnlooker = { events.append($0) }
+        monitor.setEnabled(true)
+        await wait { !self.cameras.isEmpty }
+        let me = CameraFace(bounds: CGRect(x: 0.35, y: 0.25, width: 0.3, height: 0.4), yaw: 0, pitch: 0)
+        let peeker = CameraFace(bounds: CGRect(x: 0.75, y: 0.45, width: 0.12, height: 0.18), yaw: 0.05, pitch: 0)
+        for _ in 0..<6 { await send(faces: [me]) }
+        XCTAssertFalse(monitor.onlooker)
+        for _ in 0..<8 { await send(faces: [me, peeker]) }
+        XCTAssertTrue(monitor.onlooker, "A second face facing the screen for ~2 s is an onlooker")
+        XCTAssertEqual(cameras[0].rate, 4, "Looks more often while someone else is in view")
+        for _ in 0..<10 { await send(faces: [me]) }
+        XCTAssertFalse(monitor.onlooker)
+        XCTAssertEqual(events, [true, false])
+        XCTAssertFalse(monitor.covered, "A peek alert never counts as away")
+    }
+
+    func testPeekAlertOffIgnoresOnlookers() async throws {
+        try XCTSkipIf(AVCaptureAuthorization.denied, "camera access denied for the test runner")
+        let monitor = makeMonitor()
+        monitor.peekResponse = .off
+        monitor.setEnabled(true)
+        await wait { !self.cameras.isEmpty }
+        let me = CameraFace(bounds: CGRect(x: 0.35, y: 0.25, width: 0.3, height: 0.4), yaw: 0, pitch: 0)
+        let peeker = CameraFace(bounds: CGRect(x: 0.75, y: 0.45, width: 0.12, height: 0.18), yaw: 0, pitch: 0)
+        for _ in 0..<12 { await send(faces: [me, peeker]) }
+        XCTAssertFalse(monitor.onlooker)
+    }
+
     func testScreenUnlockClearsAnAwayCover() async throws {
         try XCTSkipIf(AVCaptureAuthorization.denied, "camera access denied for the test runner")
         let monitor = makeMonitor()

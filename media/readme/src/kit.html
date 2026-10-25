@@ -1,0 +1,125 @@
+<!doctype html>
+<!-- README image kit. Renders one deterministic frame per URL, e.g.
+     kit.html?shot=banner&theme=dark · ?shot=styles · ?shot=flow · ?shot=fold&t=0.4
+     Rendered by media/readme/src/render.sh with headless Chrome. -->
+<html>
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../../site/styles.css">
+<style>
+  *, *::before, *::after { transition: none !important; animation: none !important; }
+  html, body { margin: 0; overflow: hidden; }
+  body { background: var(--bg); }
+  .kit { position: absolute; inset: 0; }
+  .glow { position: absolute; inset: -20%; background:
+      radial-gradient(40% 50% at 70% 45%, rgba(167,139,250,.35), transparent 70%),
+      radial-gradient(35% 45% at 30% 60%, rgba(240,174,232,.22), transparent 70%),
+      radial-gradient(30% 40% at 85% 85%, rgba(125,211,252,.18), transparent 70%); }
+  :root[data-theme="light"] .glow { opacity: .8; }
+  .reveal { opacity: 1 !important; transform: none !important; }
+  .bezel .screen { font-size: var(--fs, 10px); }
+  .cover .badge { opacity: 1; transform: none; }
+  .title { font-size: 76px; font-weight: 800; letter-spacing: -.045em; line-height: 1; margin: 0 0 18px; }
+  .tag { font-size: 24px; color: var(--muted); line-height: 1.45; margin: 0 0 26px; max-width: 560px; }
+  .pills { display: flex; gap: 10px; flex-wrap: wrap; }
+  .pill { font: 600 15px var(--font); padding: 8px 14px; border-radius: 99px; border: 1px solid var(--line); background: var(--glass); color: var(--muted); }
+  .label { text-align: center; font: 600 20px var(--font); margin-top: 16px; color: var(--ink); }
+  .sub { text-align: center; font: 15px var(--font); color: var(--muted); margin-top: 4px; }
+  .num { position: absolute; top: 12px; left: 14px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+         font: 700 13px var(--font); color: #120916; background: linear-gradient(135deg, #fff, var(--pink)); z-index: 40; }
+  .cam { position: absolute; right: 8px; bottom: 8px; z-index: 40; font: 600 11px var(--mono); padding: 4px 8px; border-radius: 6px;
+         background: rgba(0,0,0,.65); color: #fff; display: flex; gap: 6px; align-items: center; }
+  .cam i { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 6px #4ade80; }
+  .cam.off i { background: #555; box-shadow: none; }
+  .facebox { position: absolute; left: 41%; top: 26%; width: 18%; height: 44%; border: 2px solid #4ade80; border-radius: 8px; z-index: 35;
+             box-shadow: 0 0 12px rgba(74,222,128,.6); }
+  .ring { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 40; width: 74px; height: 74px; border-radius: 50%;
+          border: 4px solid rgba(255,255,255,.25); border-top-color: var(--pink); border-right-color: var(--pink); display: grid; place-items: center;
+          font: 700 26px var(--mono); color: #fff; background: rgba(0,0,0,.35); }
+  .keycap { position: absolute; left: 50%; bottom: 14%; transform: translateX(-50%); z-index: 45; display: flex; gap: 10px; align-items: center; }
+  .keycap kbd { font: 600 15px var(--font); padding: 9px 14px; border-radius: 9px; background: linear-gradient(180deg, #2b2e38, #17191f);
+                border: 1px solid rgba(255,255,255,.18); box-shadow: 0 3px 0 #0a0b0e; color: #fff; }
+  .keycap span { font: 600 13px var(--font); color: #fff; opacity: .8; }
+</style>
+<script>
+  const q = new URLSearchParams(location.search);
+  document.documentElement.dataset.theme = q.get("theme") || "dark";
+</script>
+</head>
+<body>
+<div class="kit"><div class="glow"></div><div id="root"></div></div>
+<script>
+const q = new URLSearchParams(location.search);
+const shot = q.get("shot") || "banner";
+const zh = q.get("lang") === "zh";
+const LOCK = `<svg class="lock" viewBox="0 0 24 24" fill="#fff"><path d="M7 10V7a5 5 0 0 1 10 0v3h1a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1h1Zm2 0h6V7a3 3 0 0 0-6 0v3Z"/></svg>`;
+function desktop() {
+  const dock = ["#ff6b6b", "#ffd166", "#06d6a0", "#4cc9f0", "#a78bfa", "#f0aee8"].map((c) => `<i style="background:linear-gradient(135deg,${c},#222)"></i>`).join("");
+  return `<div class="desktop"><div class="menubar"><b></b><b>Messages</b><span>File</span><span>Edit</span><span>View</span><span class="right">Sat 14:42</span></div>
+    <div class="win chat"><div class="bar"><i></i><i></i><i></i><span>Messages</span></div><div class="msgs">
+      <div class="m">Did the offer come through?</div><div class="m me">Yes! $96,000 🎉</div><div class="m">Don't tell anyone yet</div><div class="m me">Card ends 4721, new PIN set</div></div></div>
+    <div class="win code"><div class="bar"><i></i><i></i><i></i><span>secrets.swift</span></div><pre><span class="cm">// production credentials</span>
+<span class="k">let</span> apiKey = <span class="s">"sk-proj-9fQ2…x7Lm"</span>
+<span class="k">let</span> dbPassword = <span class="s">"hunter2-Ä8!"</span>
+<span class="k">func</span> <span class="f">transfer</span>(amount: <span class="k">Int</span>) {
+  bank.<span class="f">send</span>(amount, to: <span class="s">"4000 1234 5678 4721"</span>)
+}</pre></div>
+    <div class="win card"><span class="chipx"></span><span class="num">4000 •••• •••• 4721</span></div><div class="dock">${dock}</div></div>`;
+}
+const T = (en, cn) => (zh ? cn : en);
+// state: {style, covered, t (0..1 fold/curtain progress), black, badge: [title, line, hint], extra: html}
+function laptop(state = {}, { width = 900, fs = 10, extra = "" } = {}) {
+  const { style = "fold", covered = false, t = 1, black = false, badge = [T("Privacy protected", "隐私保护中"), T("You stepped away", "你已离开"), T("Press any key to unlock", "按任意键解锁")], led = true } = state;
+  const e = 1 - Math.pow(1 - t, 3);
+  const angle = 88.6 * (1 - e);
+  const sheetL = style === "fold" ? `transform: rotateY(${-angle}deg)` : style === "curtain" ? `transform: translateX(${-100 * (1 - e)}%)` : "";
+  const sheetR = style === "fold" ? `transform: rotateY(${angle}deg)` : style === "curtain" ? `transform: translateX(${100 * (1 - e)}%)` : "";
+  const shade = style === "fold" ? .75 * (1 - e) : 0;
+  const hinge = style === "fold" && covered && t < 1 ? Math.max(0, 1 - t * 1.4) : 0;
+  return `<div class="laptop" style="width:${width}px; --tilt-x: 6deg">
+    <div class="lid"><div class="bezel"><span class="notch"><i class="cam-led ${led ? "on" : ""}"></i></span>
+      <div class="screen style-${style} ${covered ? "covered" : ""}" style="--fs:${fs}px">${desktop()}
+        <div class="cover"><div class="frost" style="opacity:${covered ? 1 : 0}"></div>
+          <div class="stage"><div class="sheet l" style="${sheetL}"></div><div class="sheet r" style="${sheetR}"></div>
+          <div class="hinge" style="opacity:${hinge}"></div></div>
+          <div class="dim" style="opacity:${black || style === "black" ? 1 : 0}"></div>
+          <div class="badge" style="opacity:${covered && (t >= .85 || style === "frosted" || style === "black") ? 1 : 0}">${LOCK}<b>${badge[0]}</b><span>${badge[1]}</span>${badge[2] ? `<em>${badge[2]}</em>` : ""}</div>
+        </div>${extra}</div></div></div>
+    <div class="base"><span class="lip"></span></div></div>`;
+}
+const root = document.getElementById("root");
+const place = (html, style) => { root.innerHTML = `<div style="position:absolute;${style}">${html}</div>`; };
+if (shot === "banner") {
+  root.innerHTML = `
+    <div style="position:absolute; left:80px; top:150px; width:620px">
+      <h1 class="title">QuietGlass <span class="gradient-text">Plus</span></h1>
+      <p class="tag">${T("A low-power privacy screen for macOS. Step away and it covers on the first frame; come back and press any key.", "为 Mac 打造的低功耗隐私屏。离开即遮挡，回来按任意键解锁。")}</p>
+      <div class="pills"><span class="pill">macOS 14+</span><span class="pill">Neural Engine</span><span class="pill">${T("On-device", "全部本地")}</span><span class="pill">MIT</span></div>
+    </div>
+    <div style="position:absolute; right:70px; top:70px">${laptop({ covered: true, t: .55 }, { width: 760, fs: 8.5 })}</div>`;
+} else if (shot === "styles") {
+  const cell = (style, name, desc) => `<div style="width:700px">${laptop({ style, covered: true, t: 1, badge: [T("Privacy protected", "隐私保护中"), name, ""] }, { width: 700, fs: 8 })}
+    <div class="label">${name}</div><div class="sub">${desc}</div></div>`;
+  root.innerHTML = `<div style="position:absolute; inset:50px 70px; display:grid; grid-template-columns:1fr 1fr; gap:46px 90px">
+    ${cell("fold", T("Fold", "折叠"), T("Smoked glass unfolds from a center hinge", "烟熏玻璃从中缝铰链展开"))}
+    ${cell("curtain", T("Curtain", "幕布"), T("Pleated velvet springs closed", "褶皱幕布从两侧弹性合拢"))}
+    ${cell("frosted", T("Frosted", "磨砂"), T("System frosted glass, lowest power", "系统磨砂玻璃，功耗最低"))}
+    ${cell("black", T("Black", "纯黑"), T("Where every style ends after 15 s away", "离开 15 秒后所有效果的归宿"))}</div>`;
+} else if (shot === "flow") {
+  const steps = [
+    [{ covered: false }, T("At your Mac", "你在电脑前"), T("Face check, 2×/s", "人脸检测 2 次/秒"), `<div class="facebox"></div><div class="cam"><i></i>2 fps</div>`],
+    [{ covered: false }, T("You step away", "你起身离开"), T("No face for 5 s", "连续 5 秒没有人脸"), `<div class="ring">3</div><div class="cam"><i></i>2 fps</div>`],
+    [{ covered: true, t: 1 }, T("Covered", "遮挡"), T("Opaque on frame one", "第一帧就盖住"), `<div class="cam"><i></i>…</div>`],
+    [{ covered: true, t: 1, black: true, led: false }, T("Camera off", "摄像头关闭"), T("Black after 15 s", "15 秒后转为纯黑"), `<div class="cam off"><i></i>OFF</div>`],
+    [{ covered: false }, T("Back", "回来"), T("Any key · Touch ID after 1 min", "任意键 · 超过 1 分钟需 Touch ID"), `<div class="keycap"><kbd>${T("any key", "任意键")}</kbd><span>→</span><kbd>🔓</kbd></div><div class="cam"><i></i>2 fps</div>`],
+  ];
+  root.innerHTML = `<div style="position:absolute; inset:40px 40px; display:grid; grid-template-columns:repeat(5,1fr); gap:28px">${steps.map(([st, a, b, extra], i) =>
+    `<div style="position:relative"><span class="num">${i + 1}</span>${laptop(st, { width: 330, fs: 3.8, extra })}<div class="label" style="font-size:18px">${a}</div><div class="sub" style="font-size:14px">${b}</div></div>`).join("")}</div>`;
+} else if (shot === "fold") {
+  const t = parseFloat(q.get("t") || "1");
+  const covered = q.get("covered") !== "0";
+  place(laptop({ covered, t, style: q.get("style") || "fold" }, { width: 860, fs: 9.6 }), "left:50px; top:40px");
+}
+</script>
+</body>
+</html>

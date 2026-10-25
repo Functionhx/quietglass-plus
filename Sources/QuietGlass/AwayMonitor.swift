@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import ShieldCore
 
 /// How camera protection behaves.
@@ -14,6 +15,19 @@ enum ProtectionMode: String, CaseIterable, Identifiable {
         switch self {
         case .away: return L("Cover when I leave, unlock by keyboard")
         case .recognize: return L("Recognize my face automatically")
+        }
+    }
+}
+
+/// What to do when someone else is looking at your screen.
+enum PeekResponse: String, CaseIterable, Identifiable {
+    case off, alert, blur
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .off: return L("Off")
+        case .alert: return L("Alert me")
+        case .blur: return L("Blur until they look away")
         }
     }
 }
@@ -49,6 +63,15 @@ final class AwayMonitor: ObservableObject {
         return graceSeconds - Date().timeIntervalSince(coveredAt)
     }
     var onCoverage: ((Bool) -> Void)?
+    /// Someone else is facing the screen (Honor-style "someone is peeking").
+    @Published private(set) var onlooker = false
+    @Published var peekResponse: PeekResponse {
+        didSet { preferences.set(peekResponse.rawValue, forKey: "peekResponse"); if peekResponse == .off { setOnlooker(false) } }
+    }
+    var onOnlooker: ((Bool) -> Void)?
+    private var attention = NearbyAttentionPolicy()
+    private var onlookerClearedSince: TimeInterval?
+    private var rate = 2.0
 
     private let preferences: UserDefaults
     private let makeCamera: (@escaping (Result<NearbyFaceSample, NearbyCameraFailure>) -> Void) -> NearbyCameraSession
@@ -58,6 +81,12 @@ final class AwayMonitor: ObservableObject {
     private var generation = 0
     private var pauseReasons: Set<NearbyPauseReason> = []
     private var stallTimer: Timer?
+    /// Recent (time, faces, people) samples, logged when the screen covers so a false
+    /// trigger can be diagnosed from Console: subsystem local.clinton.QuietGlass, category Away.
+    private var recent: [(TimeInterval, Int, Int)] = []
+    private let logger = Logger(subsystem: "local.clinton.QuietGlass", category: "Away")
+    /// Seconds before covering when someone was last seen; shown in Settings.
+    @Published private(set) var lastCoverNote: String?
 
     init(preferences: UserDefaults = .standard,
          makeCamera: @escaping (@escaping (Result<NearbyFaceSample, NearbyCameraFailure>) -> Void) -> NearbyCameraSession = { SharedFaceCamera(completion: $0) },
@@ -70,6 +99,7 @@ final class AwayMonitor: ObservableObject {
         policy = AwayPolicy(delay: delay)
         unlockRequiresAuthentication = preferences.object(forKey: "awayUnlockRequiresAuth") as? Bool ?? true
         graceSeconds = preferences.object(forKey: "awayGrace") as? Double ?? 60
+        peekResponse = PeekResponse(rawValue: preferences.string(forKey: "peekResponse") ?? "") ?? .alert
         wantsMonitoring = preferences.bool(forKey: "awayEnabled")
     }
 
@@ -123,6 +153,8 @@ final class AwayMonitor: ObservableObject {
             }
             guard let self, self.generation == token, self.wantsMonitoring, !self.covered else { return }
             self.policy.start(at: self.clock())
+            self.attention = NearbyAttentionPolicy()
+            self.rate = 2
             let camera = self.makeCamera { [weak self] result in
                 Task { @MainActor in
                     guard let self, self.generation == token else { return }
@@ -135,13 +167,14 @@ final class AwayMonitor: ObservableObject {
             self.camera = camera
             camera.configureDevice(self.preferences.string(forKey: CameraSelection.preferenceKey))
             camera.configureRecognition(false)
+            camera.configurePresence(true)
             camera.configureRate(2)
             camera.start()
             self.watching = true
             let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
                 Task { @MainActor in
                     guard let self, self.generation == token else { return }
-                    if self.policy.checkStalled(at: self.clock()) { self.becameAway() }
+                    if self.policy.checkStalled(at: self.clock()) { self.becameAway(stalled: true) }
                 }
             }
             timer.tolerance = 0.5
@@ -152,16 +185,52 @@ final class AwayMonitor: ObservableObject {
 
     private func received(_ sample: NearbyFaceSample) {
         if failure != nil { failure = nil }
-        if policy.observe(faceCount: sample.count, at: sample.capturedAt) { becameAway() }
+        let people = sample.people ?? sample.count
+        recent.append((sample.capturedAt, sample.count, people))
+        if recent.count > 40 { recent.removeFirst(recent.count - 40) }
+        if policy.observe(faceCount: people, at: sample.capturedAt) { becameAway(stalled: false); return }
+        observeOnlookers(sample)
     }
 
-    private func becameAway() {
+    /// Reuses upstream's facing-screen policy: an extra face must face the screen for a
+    /// moment; brief passers-by and people facing away are ignored.
+    private func observeOnlookers(_ sample: NearbyFaceSample) {
+        guard peekResponse != .off, let faces = sample.faces else { return }
+        let threat = attention.observe(faces, ownerIndex: nil, at: sample.capturedAt)
+        if threat { onlookerClearedSince = nil; setOnlooker(true) }
+        else if onlooker {
+            // Hold the alert briefly so it doesn't flicker as heads move.
+            if onlookerClearedSince == nil { onlookerClearedSince = sample.capturedAt }
+            if sample.capturedAt - (onlookerClearedSince ?? sample.capturedAt) >= 1.5 { setOnlooker(false) }
+        }
+        // Look more often while a second face is in view.
+        let wanted = sample.count > 1 || onlooker ? 4.0 : 2.0
+        if wanted != rate { rate = wanted; camera?.configureRate(wanted) }
+    }
+
+    private func setOnlooker(_ value: Bool) {
+        guard onlooker != value else { return }
+        onlooker = value
+        if value { logger.notice("Onlooker detected") }
+        onOnlooker?(value)
+    }
+
+    private func becameAway(stalled: Bool = true) {
+        let now = clock()
+        let lastSeen = recent.last(where: { $0.2 > 0 }).map { now - $0.0 }
+        let window = recent.filter { now - $0.0 <= delay + 1 }
+        let summary = window.map { "\($0.1)/\($0.2)" }.joined(separator: " ")
+        logger.notice("Away cover: \(stalled ? "camera stalled" : "nobody seen", privacy: .public); last person \(lastSeen.map { String(format: "%.1f s", $0) } ?? "never", privacy: .public) ago; faces/people: \(summary, privacy: .public)")
+        lastCoverNote = stalled ? L("Last cover: the camera stopped sending frames")
+            : LF("Last cover: nobody seen for %d s", Int((lastSeen ?? delay).rounded()))
+        recent.removeAll()
         setCovered(true)
         // Nobody needs the camera until you unlock by hand.
         stopCamera()
     }
 
     private func stopCamera() {
+        setOnlooker(false)
         generation += 1
         camera?.stop(); camera = nil
         stallTimer?.invalidate(); stallTimer = nil

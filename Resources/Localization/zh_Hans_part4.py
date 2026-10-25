@@ -11,7 +11,11 @@ T = {
 "Covers when you leave or another face appears, and clears when it recognizes a saved face.":
     "离开或出现其他人时遮挡，认出已保存的面孔后自动解除。",
 "Cover after I leave for": "离开多久后遮挡", "Looking down or away briefly does not count.": "短暂低头或转开视线不算离开。",
-"%d seconds": "%d 秒", "%d min": "%d 分钟",
+"%d seconds": "%d 秒",
+"Someone is looking at your screen": "有人在看你的屏幕", "Clears when they look away": "对方移开视线后自动恢复",
+"Alert me": "提醒我", "Blur until they look away": "自动模糊，移开视线后恢复", "Peek alert": "偷窥提醒",
+"Like Honor phones: when someone else faces your screen, warn you or blur until they look away.": "类似荣耀手机：有其他人面朝你的屏幕时提醒你，或者自动模糊直到对方移开视线。",
+"Last cover: nobody seen for %d s": "上次遮挡：%d 秒没有检测到人", "Last cover: the camera stopped sending frames": "上次遮挡：摄像头停止输出画面", "%d min": "%d 分钟",
 "Press any key to unlock": "按任意键解锁", "Press Esc to unlock with Touch ID": "按 Esc，用 Touch ID 解锁", "Unlock": "解锁",
 "Any key unlocks for": "任意键解锁时限",
 "Right after the screen covers, any key unlocks it. After this time, unlocking needs Touch ID or your Mac password.": "遮挡后这段时间内按任意键即可解锁；超过之后，需要 Touch ID 或 Mac 密码。",
