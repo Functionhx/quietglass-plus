@@ -81,7 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         model.onCancelHeadSetup = { [weak self] in self?.headSetup.close() }
         let mainMenu = NSMenu()
         let applicationItem = NSMenuItem()
-        let applicationMenu = NSMenu(title: "QuietGlass")
+        let applicationMenu = NSMenu(title: L("QuietGlass"))
         item("About QuietGlass", #selector(showAbout), in: applicationMenu)
         applicationMenu.addItem(.separator())
         item("Settings…", #selector(showPrivacySettings), in: applicationMenu, key: ",")
@@ -92,7 +92,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         applicationItem.submenu = applicationMenu
         mainMenu.addItem(applicationItem)
         let editItem = NSMenuItem(title: L("Edit"), action: nil, keyEquivalent: "")
-        let editMenu = NSMenu(title: "Edit")
+        let editMenu = NSMenu(title: L("Edit"))
         editMenu.addItem(withTitle: L("Undo"), action: Selector(("undo:")), keyEquivalent: "z")
         let redo = editMenu.addItem(withTitle: L("Redo"), action: Selector(("redo:")), keyEquivalent: "z")
         redo.keyEquivalentModifierMask = [.command, .shift]
@@ -104,7 +104,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         editItem.submenu = editMenu
         mainMenu.addItem(editItem)
         let viewItem = NSMenuItem(title: L("View"), action: nil, keyEquivalent: "")
-        let viewMenu = NSMenu(title: "View")
+        let viewMenu = NSMenu(title: L("View"))
         let sidebar = item("Toggle Sidebar", #selector(toggleSettingsSidebar), in: viewMenu, key: "s")
         sidebar.keyEquivalentModifierMask = [.command]
         viewMenu.addItem(.separator())
@@ -114,7 +114,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         viewItem.submenu = viewMenu
         mainMenu.addItem(viewItem)
         let helpItem = NSMenuItem(title: L("Help"), action: nil, keyEquivalent: "")
-        let helpMenu = NSMenu(title: "Help")
+        let helpMenu = NSMenu(title: L("Help"))
         item("QuietGlass Help", #selector(showHelp), in: helpMenu)
         item("Report an Issue…", #selector(reportIssue), in: helpMenu)
         helpItem.submenu = helpMenu
@@ -174,7 +174,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(title)
         menu.addItem(.separator())
         let profiles = NSMenuItem(title: L("Profile"), action: nil, keyEquivalent: "")
-        let profileMenu = NSMenu(title: "Profile")
+        let profileMenu = NSMenu(title: L("Profile"))
         for profile in PrivacyProfile.allCases {
             let entry = item(profile.title, #selector(selectProfile(_:)), in: profileMenu)
             entry.representedObject = profile.rawValue
