@@ -88,9 +88,13 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
     var onCancelHeadSetup: (() -> Void)?
 
     private let motion = CMHeadphoneMotionManager()
+    /// Earbuds using Android's head tracker HID protocol, e.g. Sony WF-1000XM6.
+    private let headphones = HIDHeadTracker()
     private let overlay = ShieldOverlay()
     let cover = PrivacyCover()
     private var demoCovered = false
+    /// Head tracking (AirPods, earbuds, camera) is turned away, shown with the capture-free cover.
+    private var headCovered = false
     private let shortcuts = GlobalShortcuts()
     private var response = ShieldResponse()
     private var center: simd_quatd?
@@ -139,6 +143,14 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         shortcutLabel = prefs.string(forKey: "shortcutLabel") ?? "⌃⌥⌘C"
         super.init()
         cameraTracking.onChange = { [weak self] in self?.receiveCameraTracking() }
+        headphones.onSample = { [weak self] sample in
+            guard let self, self.enabled, self.trackingSource == .headphones else { return }
+            self.receive(orientation: sample.orientation)
+        }
+        headphones.onConnectionChange = { [weak self] connected in
+            guard let self, self.enabled, self.trackingSource == .headphones else { return }
+            if connected { self.beginMotionIfAvailable() } else { self.motionDisconnected() }
+        }
         nearby.onCoverage = { [weak self] value in
             guard let self else { return }
             self.privacy.setNearbyCovered(value && self.coverStyle.usesScreenCapture)
@@ -193,7 +205,7 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         shortcuts.onEscape = { [weak self] in
             guard let self else { return }
             if self.headSetupActive { self.onCancelHeadSetup?() }
-            else if self.cover.isCovered && self.nearby.owner.enabled {
+            else if self.cover.isCovered && self.nearby.covered && self.nearby.owner.enabled {
                 // Escape used to clear everything. With Recognize me, a covered screen
                 // must not be dismissible by whoever is sitting at the keyboard.
                 self.authenticateThen("Turn off QuietGlass protection.") { $0.dismissShield() }
@@ -349,9 +361,9 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
     /// Shows the capture-free cover for Nearby people / Recognize me and keeps its prompt current.
     func updateCover() {
         updateAutoLock()
-        let wanted = !coverStyle.usesScreenCapture && (nearby.covered || demoCovered)
+        let wanted = !coverStyle.usesScreenCapture && (nearby.covered || demoCovered || headCovered)
         guard wanted else { cover.hide(); return }
-        let title = demoCovered && !nearby.covered ? String(localized: "Protection check") : nearby.noticeTitle
+        let title = nearby.covered ? nearby.noticeTitle : headCovered ? L("Looking away") : L("Protection check")
         let detail = nearby.owner.enabled && nearby.covered ? String(localized: "Look at the camera to unlock") : ""
         if cover.badge.title != title { cover.badge.title = title }
         if cover.badge.detail != detail { cover.badge.detail = detail }
@@ -472,7 +484,11 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         stop()
         trackingSource = source
         UserDefaults.standard.set(source.rawValue, forKey: "headTrackingSource")
-        detail = source == .camera ? "Use your camera to blur when you turn away. Start tracking to calibrate." : "Connect your AirPods to this Mac, then start head tracking."
+        switch source {
+        case .camera: detail = "Use your camera to blur when you turn away. Start tracking to calibrate."
+        case .headphones: detail = "Connect earbuds that support head tracking, such as Sony WF-1000XM6."
+        case .airPods: detail = "Connect your AirPods to this Mac, then start head tracking."
+        }
     }
 
     func selectTrackingCamera(_ id: String) {
@@ -526,6 +542,13 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
             enabled = true; dismissedForLoss = false
             startCameraTracking(); return
         }
+        if trackingSource == .headphones {
+            enabled = true
+            status = "Connecting to headphones"
+            detail = headphones.isConnected ? "Look at the screen, then click Center my gaze." : "Connect earbuds that support head tracking, such as Sony WF-1000XM6."
+            beginMotionIfAvailable()
+            return
+        }
         if !headSetupActive, !hasCompletedHeadSetup, let onRequestHeadSetup {
             onRequestHeadSetup()
             return
@@ -551,6 +574,7 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         cameraTracking.stop()
         motion.stopDeviceMotionUpdates()
         motion.stopConnectionStatusUpdates()
+        headphones.stop()
         center = nil
         latest = nil
         sourceLocation = nil
@@ -567,6 +591,13 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
     }
 
     private func beginMotionIfAvailable() {
+        if trackingSource == .headphones {
+            guard enabled, headphones.isConnected, !headphones.streaming else { return }
+            motionReferenceGeneration += 1
+            invalidateDisplayCalibration()
+            headphones.start()
+            return
+        }
         guard trackingSource == .airPods, enabled, !motion.isDeviceMotionActive, motion.isDeviceMotionAvailable else { return }
         motionReferenceGeneration += 1
         invalidateDisplayCalibration()
@@ -594,13 +625,19 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
             detail = "The active AirPod changed. Face your screen and recenter."
         }
         sourceLocation = sample.sensorLocation
-        latest = simd_normalize(simd_quatd(ix: q.x, iy: q.y, iz: q.z, r: q.w))
+        receive(orientation: simd_quatd(ix: q.x, iy: q.y, iz: q.z, r: q.w))
+    }
+
+    /// Shared by AirPods and HID earbuds.
+    private func receive(orientation: simd_quatd) {
+        let now = ProcessInfo.processInfo.systemUptime
+        latest = simd_normalize(orientation)
         lastSample = now
         if !connected { connected = true }
         if pendingCalibration { recenter() }
         if let center, let latest, now - lastPublished > 1.0 / 30 {
             lastPublished = now
-            offset = HeadOffset.between(center: center, current: latest)
+            offset = headOffset(center: center, current: latest)
             if learning { calibration.record(angle: offset.angle) }
             updateShield()
         } else if center == nil {
@@ -706,6 +743,20 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
     }
 
     @discardableResult private func applyCoverage(_ value: Double, direction: ShieldDirection, displays: [UInt32: Double]? = nil) -> Bool {
+        // Capture-free styles cover the whole screen once you turn past the threshold;
+        // the gradual, directional blur (and per-display coverage) needs screen capture.
+        if !coverStyle.usesScreenCapture && displays == nil {
+            let wanted = value > 0.001
+            if wanted, !shortcuts.armEscape(true) {
+                clearOverlay()
+                status = "Escape is unavailable"
+                detail = "Another app reserved Escape. Pause that shortcut and try again."
+                return false
+            }
+            if headCovered != wanted { headCovered = wanted; updateCover() }
+            if coverage != value { coverage = value }
+            return true
+        }
         if value > 0.001 {
             guard screenPermission else {
                 clearOverlay()
@@ -729,6 +780,7 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
 
     private func clearOverlay() {
         overlay.clear()
+        if headCovered { headCovered = false; updateCover() }
         if coverage != 0 { coverage = 0 }
         refreshEscape()
     }
@@ -810,7 +862,7 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
             dismissedForLoss = snapshot.dismissedForLoss
             response = snapshot.response
             refreshResponse()
-            if let center, let latest { offset = HeadOffset.between(center: center, current: latest) }
+            if let center, let latest { offset = headOffset(center: center, current: latest) }
         } else {
             comfort = snapshot.comfort
             stop()
@@ -938,7 +990,7 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         guard enabled else { return }
         if trackingSource == .camera { return }
         let auth = CMHeadphoneMotionManager.authorizationStatus()
-        if auth == .denied || auth == .restricted {
+        if trackingSource == .airPods, auth == .denied || auth == .restricted {
             stop()
             status = "Motion permission needed"
             detail = "Allow QuietGlass in Privacy & Security → Motion & Fitness, then start again."
@@ -954,7 +1006,12 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
                 calibrated = false
                 detail = "Motion stopped. Wear your AirPods and recenter when they reconnect."
             }
-            if !everCalibrated { status = "Waiting for AirPods motion" }
+            if !everCalibrated { status = trackingSource == .headphones ? "Waiting for headphone motion" : "Waiting for AirPods motion" }
+            if trackingSource == .headphones {
+                // Settling after power-up is not an interruption.
+                if headphones.warmingUp { status = "Headphone sensor is settling…"; return }
+                headphones.stop()
+            }
             beginMotionIfAvailable()
             updateShield()
         }
@@ -977,6 +1034,7 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         pauseCamera(for: .systemSleep)
         privacy.dismissAll()
         motion.stopDeviceMotionUpdates()
+        headphones.stop()
         center = nil
         latest = nil
         connected = false
@@ -992,16 +1050,27 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
     nonisolated func headphoneMotionManagerDidDisconnect(_ manager: CMHeadphoneMotionManager) {
         Task { @MainActor [weak self] in
             guard let self, self.enabled, self.trackingSource == .airPods else { return }
-            self.motionReferenceGeneration += 1
-            self.invalidateDisplayCalibration()
-            self.cancelLearning(message: "AirPods disconnected. Reconnect and try again.")
-            self.connected = false
-            self.calibrated = false
-            self.center = nil
-            self.latest = nil
-            self.detail = "AirPods disconnected. Face the screen and recenter after reconnecting."
-            self.updateShield()
+            self.motionDisconnected()
         }
+    }
+
+    private func motionDisconnected() {
+        motionReferenceGeneration += 1
+        invalidateDisplayCalibration()
+        cancelLearning(message: "AirPods disconnected. Reconnect and try again.")
+        connected = false
+        calibrated = false
+        center = nil
+        latest = nil
+        detail = trackingSource == .headphones ? "Headphones disconnected. Face the screen and recenter after reconnecting."
+            : "AirPods disconnected. Face the screen and recenter after reconnecting."
+        updateShield()
+    }
+
+    /// Earbud sensor frames are tilted in the ear; measure the total turn instead.
+    private func headOffset(center: simd_quatd, current: simd_quatd) -> HeadOffset {
+        guard trackingSource == .headphones else { return HeadOffset.between(center: center, current: current) }
+        return HeadOffset.between(center: center, current: current, up: HIDHeadTracker.defaultUp, right: HIDHeadTracker.defaultRight)
     }
 
     private func refreshResponse() {

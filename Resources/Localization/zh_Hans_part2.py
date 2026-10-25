@@ -52,7 +52,11 @@ T = {
 "Applies to full-screen, window, and detected-text blur.": "适用于全屏、窗口和敏感文字模糊。", "Sample blur preview": "模糊效果示例",
 "Sample preview": "示例预览", "Lowest blur strength": "最低模糊强度", "Highest blur strength": "最高模糊强度",
 # Camera head tracking
-"AirPods": "AirPods", "Camera": "摄像头", "Face your screen to calibrate.": "请面向屏幕进行校准。",
+"AirPods": "AirPods", "Camera": "摄像头", "Sony & other earbuds": "Sony 等耳机",
+"Connecting to headphones": "正在连接耳机", "Look at the screen, then click Center my gaze.": "请看向屏幕，然后点按“以当前视线为中心”。",
+"Connect earbuds that support head tracking, such as Sony WF-1000XM6.": "请连接支持头部追踪的耳机，例如 Sony WF-1000XM6。",
+"Waiting for headphone motion": "正在等待耳机运动数据", "Headphones disconnected. Face the screen and recenter after reconnecting.": "耳机已断开，重新连接后请面向屏幕并重新居中。",
+"Looking away": "视线已移开", "Headphone sensor is settling…": "耳机传感器校准中…", "Face your screen to calibrate.": "请面向屏幕进行校准。",
 "Look at the screen and hold still for a moment.": "请看向屏幕并保持不动片刻。", "Hold still while your position is calibrated…": "正在校准位置，请保持不动…",
 "Keep only your face in view and look at the screen.": "画面中只保留你一人，并看向屏幕。", "Face unavailable · Screen protected": "未检测到面孔 · 屏幕已保护",
 "Checking your position…": "正在检查你的位置…", "Looking away · Screen protected": "视线已移开 · 屏幕已保护", "Camera head tracking is on": "摄像头头部追踪已开启",

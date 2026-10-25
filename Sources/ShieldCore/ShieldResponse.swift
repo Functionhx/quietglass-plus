@@ -103,3 +103,45 @@ public struct GlassTransition {
 
     public mutating func reset() { value = 0; velocity = 0 }
 }
+
+extension HeadOffset {
+    /// For head trackers whose sensor frame is not aligned with the head, such as
+    /// earbuds that sit tilted in the ear. The covering angle is the total rotation
+    /// from center, which does not depend on the frame; yaw and pitch only split it
+    /// along the given axes to pick the blur direction. `up` is the axis a left turn
+    /// rotates about; `right` the axis looking up rotates about.
+    public static func between(center: simd_quatd, current: simd_quatd, up: SIMD3<Double>, right: SIMD3<Double>) -> HeadOffset {
+        var relative = simd_normalize(center.inverse * current)
+        if relative.real < 0 { relative = simd_quatd(vector: -relative.vector) }
+        let degrees = relative.angle * 180 / .pi
+        guard degrees.isFinite, degrees > 1e-6 else { return HeadOffset(yaw: 0, pitch: 0, angle: 0) }
+        let axis = relative.axis
+        return HeadOffset(yaw: degrees * simd_dot(axis, up), pitch: degrees * simd_dot(axis, right), angle: degrees)
+    }
+}
+
+/// Android's head tracker HID protocol (used by Sony and other earbuds) reports a
+/// rotation vector whose reference frame jumps whenever the reset counter changes.
+/// Stitching keeps the orientation continuous so a calibrated center stays valid.
+public struct HeadTrackerStitcher {
+    private var correction = simd_quatd(ix: 0, iy: 0, iz: 0, r: 1)
+    private var lastCounter: UInt8?
+    private var lastOutput: simd_quatd?
+    public private(set) var resets = 0
+    public init() {}
+
+    /// `rotation` is the reported axis-angle vector in radians.
+    public mutating func orientation(rotation: SIMD3<Double>, resetCounter: UInt8) -> simd_quatd? {
+        guard rotation.x.isFinite, rotation.y.isFinite, rotation.z.isFinite else { return nil }
+        let angle = simd_length(rotation)
+        let raw = angle > 1e-9 ? simd_quatd(angle: angle, axis: rotation / angle) : simd_quatd(ix: 0, iy: 0, iz: 0, r: 1)
+        if let lastCounter, lastCounter != resetCounter, let lastOutput {
+            correction = simd_normalize(lastOutput * raw.inverse)
+            resets += 1
+        }
+        lastCounter = resetCounter
+        let output = simd_normalize(correction * raw)
+        lastOutput = output
+        return output
+    }
+}

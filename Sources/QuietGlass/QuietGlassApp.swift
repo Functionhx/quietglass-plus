@@ -9,6 +9,13 @@ struct QuietGlassApp {
     @MainActor static func main() {
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)
+        if CommandLine.arguments.contains("--headphone-check") {
+            // Development aid: voice-guided check of HID earbud head tracking.
+            let check = HeadphoneCheck()
+            check.run()
+            withExtendedLifetime(check) { app.run() }
+            return
+        }
         if let index = CommandLine.arguments.firstIndex(of: "--preview-cover") {
             // Development aid: cover, hold, reveal and quit, without camera or settings.
             let style = CoverStyle(rawValue: CommandLine.arguments.dropFirst(index + 1).first ?? "") ?? .fold

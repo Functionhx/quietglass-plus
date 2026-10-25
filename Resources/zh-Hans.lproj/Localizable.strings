@@ -170,6 +170,7 @@
 "Confirm it’s you" = "确认是你本人";
 "Confirmation open" = "确认已展开";
 "Connect another display to set a separate head position for each screen." = "连接另一台显示器后，可为每块屏幕设置单独的头部位置。";
+"Connect earbuds that support head tracking, such as Sony WF-1000XM6." = "请连接支持头部追踪的耳机，例如 Sony WF-1000XM6。";
 "Connect your AirPods" = "连接你的 AirPods";
 "Connect your AirPods and start tracking to calibrate." = "连接 AirPods 并开始追踪以进行校准。";
 "Connect your AirPods to this Mac, then start head tracking." = "将 AirPods 连接到这台 Mac，然后开始头部追踪。";
@@ -177,6 +178,7 @@
 "Connect your AirPods, then face the screen to get ready." = "连接 AirPods，然后面向屏幕做好准备。";
 "Connected displays" = "已连接的显示器";
 "Connecting to AirPods" = "正在连接 AirPods";
+"Connecting to headphones" = "正在连接耳机";
 "Continue" = "继续";
 "Control" = "控制";
 "Copy" = "拷贝";
@@ -267,6 +269,8 @@
 "Head tracking is on" = "头部追踪已开启";
 "Head tracking is paused" = "头部追踪已暂停";
 "Head tracking source" = "头部追踪来源";
+"Headphone sensor is settling…" = "耳机传感器校准中…";
+"Headphones disconnected. Face the screen and recenter after reconnecting." = "耳机已断开，重新连接后请面向屏幕并重新居中。";
 "Help" = "帮助";
 "Hide Notch" = "隐藏刘海栏";
 "Hide for 1 hour" = "隐藏 1 小时";
@@ -310,10 +314,12 @@
 "Look at the camera again" = "请再次看向摄像头";
 "Look at the camera to unlock" = "看向摄像头即可解锁";
 "Look at the screen and hold still for a moment." = "请看向屏幕并保持不动片刻。";
+"Look at the screen, then click Center my gaze." = "请看向屏幕，然后点按“以当前视线为中心”。";
 "Look at your screen and hold still to set your normal position." = "看向屏幕并保持不动，以设定你的正常位置。";
 "Look at your screen and recenter after waking your Mac." = "唤醒 Mac 后请看向屏幕并重新居中。";
 "Look away, then face your screen again. Try it safely here before protecting your desktop." = "先转开视线，再面向屏幕。在保护桌面前先在这里安全地试一试。";
 "Look gently %@" = "请轻轻看向%@";
+"Looking away" = "视线已移开";
 "Looking away · Screen protected" = "视线已移开 · 屏幕已保护";
 "Lowest blur strength" = "最低模糊强度";
 "Maximum 24 hours" = "最多 24 小时";
@@ -531,6 +537,7 @@
 "Small movements stay clear. Turn past %d° to cover the screen." = "小幅动作不会触发，转头超过 %d° 将遮挡屏幕。";
 "Smaller angles respond to smaller turns." = "角度越小，对小幅转头越敏感。";
 "Solid black." = "纯黑遮挡。";
+"Sony & other earbuds" = "Sony 等耳机";
 "Space" = "空格";
 "Standard" = "标准";
 "Start" = "开始";
@@ -612,6 +619,7 @@
 "Waiting for a steady single face…" = "正在等待单人稳定出现…";
 "Waiting for camera access…" = "正在等待摄像头权限…";
 "Waiting for confirmation…" = "正在等待确认…";
+"Waiting for headphone motion" = "正在等待耳机运动数据";
 "Waiting for live motion…" = "正在等待实时运动数据…";
 "Waiting for motion. Keep your AirPods connected and face the screen." = "正在等待运动数据，请保持 AirPods 连接并面向屏幕。";
 "Waiting for your AirPods to connect…" = "正在等待 AirPods 连接…";

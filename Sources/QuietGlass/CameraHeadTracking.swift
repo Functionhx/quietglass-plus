@@ -3,9 +3,15 @@ import Foundation
 import ShieldCore
 
 enum HeadTrackingSource: String, CaseIterable, Identifiable {
-    case airPods, camera
+    case airPods, headphones, camera
     var id: String { rawValue }
-    var title: String { self == .airPods ? "AirPods" : "Camera" }
+    var title: String {
+        switch self {
+        case .airPods: return "AirPods"
+        case .headphones: return "Sony & other earbuds"
+        case .camera: return "Camera"
+        }
+    }
 }
 
 @MainActor
