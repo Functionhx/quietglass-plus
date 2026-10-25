@@ -84,7 +84,7 @@ private struct CameraChoiceMenu: NSViewRepresentable {
                 menu.addItem(item)
             }
             menu.addItem(.separator())
-            let refresh = NSMenuItem(title: "Refresh cameras", action: #selector(refreshCameras(_:)), keyEquivalent: "")
+            let refresh = NSMenuItem(title: L("Refresh cameras"), action: #selector(refreshCameras(_:)), keyEquivalent: "")
             refresh.target = self; menu.addItem(refresh)
             menu.popUp(positioning: nil, at: NSPoint(x: 0, y: -4), in: sender)
         }

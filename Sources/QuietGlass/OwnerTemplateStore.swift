@@ -16,7 +16,7 @@ enum OwnerSetupError: LocalizedError {
         case .keychain: return "Keychain could not securely access your face data. Try again after unlocking your Mac."
         case .camera: return "Camera access is required for owner setup. Allow it in System Settings."
         case .model: return "The recognition model is unavailable. Reinstall QuietGlass; protection will stay on."
-        case .tooManyFaces: return "You can save up to \(FaceProfiles.maximumCount) faces. Delete one to add another."
+        case .tooManyFaces: return LF("You can save up to %d faces. Delete one to add another.", FaceProfiles.maximumCount)
         }
     }
 }

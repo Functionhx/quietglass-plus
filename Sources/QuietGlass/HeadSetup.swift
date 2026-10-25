@@ -328,13 +328,13 @@ private struct HeadSetupView: View {
                 Text(model.enabled ? "Waiting for live motion…" : model.status).font(.system(size: 12))
             }.foregroundStyle(.secondary)
         } else if phase == .movement {
-            Text(movement.isComplete ? "All directions checked" : "\(movement.completed.count) of 4 directions checked")
+            Text(movement.isComplete ? L("All directions checked") : LF("%d of 4 directions checked", movement.completed.count))
                 .font(.system(size: 12, weight: .medium)).foregroundStyle(pink)
         } else if phase == .learning {
             Text("Head blur is paused during setup")
                 .font(.system(size: 12)).foregroundStyle(.secondary)
         } else if phase == .review {
-            Button("Keep my current \(Int(model.comfort))°") { beginTest() }
+            Button(LF("Keep my current %d°", Int(model.comfort))) { beginTest() }
                 .buttonStyle(.plain)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.white.opacity(0.6))
@@ -397,7 +397,7 @@ private struct HeadSetupView: View {
         case .welcome: return model.hasCompletedHeadSetup ? "Recalibrate head tracking" : "Set up head tracking"
         case .connection: return "Connect your AirPods"
         case .center: return "Face your screen"
-        case .movement: return movement.isComplete ? "Movement looks good" : "Look gently \(directionName)"
+        case .movement: return movement.isComplete ? "Movement looks good" : LF("Look gently %@", L(directionName))
         case .readyToLearn, .learning: return "Find your comfortable range"
         case .review: return "Choose your sensitivity"
         case .test: return testedCenter && isCentered ? "You're ready" : "Try your blur"
@@ -428,7 +428,7 @@ private struct HeadSetupView: View {
         case .movement: return "Continue"
         case .readyToLearn: return "Learn for 8 seconds"
         case .learning: return "Learning…"
-        case .review: return "Use \(Int(model.suggestedComfort ?? model.comfort))°"
+        case .review: return LF("Use %d°", Int(model.suggestedComfort ?? model.comfort))
         case .test: return !model.screenPermission ? "Allow screen access" : "Finish setup"
         }
     }

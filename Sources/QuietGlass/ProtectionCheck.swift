@@ -71,7 +71,7 @@ final class ProtectionCheck: ObservableObject {
               sample.capturedAt <= clock(), clock() - sample.capturedAt <= 1 else { return }
         lastFrame = sample.capturedAt
         faces = sample.bounds.filter { !$0.isEmpty && $0.minX >= 0 && $0.minY >= 0 && $0.maxX <= 1 && $0.maxY <= 1 }
-        message = sample.count == 0 ? "No faces in view" : sample.count == 1 ? "One face in view" : "\(sample.count) faces in view"
+        message = sample.count == 0 ? "No faces in view" : sample.count == 1 ? "One face in view" : LF("%d faces in view", sample.count)
         if sample.count == 1, let face = faces.first, (0.33...0.67).contains(face.midX) { sawCenter = true }
         if sawCenter, faces.count > 1 {
             // The maker stays in the center while the second person enters each edge.
@@ -273,7 +273,7 @@ struct ProtectionCheckView: View {
     }
 
     private var responseDetail: String {
-        if let seconds = check.demoSeconds { return "Blur starts in \(seconds) seconds." }
+        if let seconds = check.demoSeconds { return LF("Blur starts in %d seconds.", seconds) }
         if check.demoBlurred { return "Blur clears automatically after 3 seconds." }
         if !canBlur { return "Allow Screen Recording to try this." }
         if check.demonstrated { return "Your warning delay hasn’t changed." }

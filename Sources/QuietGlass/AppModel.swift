@@ -290,7 +290,7 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         displayCalibrationTask = Task { [weak self] in
             for second in stride(from: 3, through: 1, by: -1) {
                 guard let self else { return }
-                self.displayCalibrationNotice = "Face the selected display · \(second)"
+                self.displayCalibrationNotice = LF("Face the selected display · %@", "\(second)")
                 do { try await Task.sleep(nanoseconds: 1_000_000_000) } catch { return }
             }
             guard let self, self.perDisplayTracking, self.canRecenter, let latest = self.latest,
@@ -373,12 +373,12 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         return nearbyBlurUnavailable ? "Privacy blur unavailable" : nearby.noticeTitle
     }
     var nearbyNoticeDetail: String {
-        if let seconds = protectionCheck.demoSeconds { return "Test blur starts in \(seconds) seconds" }
+        if let seconds = protectionCheck.demoSeconds { return LF("Test blur starts in %d seconds", seconds) }
         if protectionCheck.demoBlurred {
             return privacy.captureUnavailable ? "Test blur unavailable · Check Screen Recording" : "Test blur clears automatically · Esc to stop"
         }
         if let seconds = nearby.pauseSecondsRemaining {
-            return String(format: "Resumes in %d:%02d", seconds / 60, seconds % 60)
+            return LF("Resumes in %d:%02d", seconds / 60, seconds % 60)
         }
         if nearbyBlurUnavailable { return "Open Settings to restore it" }
         if nearby.covered && !privacy.ready { return "Preparing blur · Esc to clear" }
@@ -592,7 +592,7 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         stopPreview()
         clearOverlay()
         status = "Watching your head motion"
-        detail = "Small movements stay clear. Turn past \(Int(comfort))° to cover the screen."
+        detail = LF("Small movements stay clear. Turn past %d° to cover the screen.", Int(comfort))
     }
 
     func dismissShield(file: StaticString = #fileID, line: UInt = #line) {
@@ -615,7 +615,7 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
             stopPreview()
             if privacy.captureUnavailable { status = "Privacy capture needs attention" }
             else if !privacy.ready { status = "Preparing privacy blur" }
-            else { status = privacy.nearbyCovered ? "Covered · \(nearby.noticeTitle)" : privacy.peeking ? "Peeking at your screen" : "Privacy blur is on" }
+            else { status = privacy.nearbyCovered ? L("Covered · ") + L(nearby.noticeTitle) : privacy.peeking ? "Peeking at your screen" : "Privacy blur is on" }
             return
         }
         guard !previewing else { return }
@@ -630,7 +630,7 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         }
         if privacy.ruleMode == .pause {
             clearOverlay()
-            status = "Head blur paused for \(privacy.frontAppName)"
+            status = LF("Head blur paused for %@", privacy.frontAppName)
             return
         }
         if trackingSource == .camera {
@@ -660,7 +660,7 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         if !response.dismissedUntilCentered { dismissedForLoss = false }
         guard applyCoverage(value, direction: .from(offset)) else { return }
         if response.dismissedUntilCentered { status = "Shield dismissed until you face center" }
-        else if value > 0.001 { status = "Screen covered \(Int(value * 100))%" }
+        else if value > 0.001 { status = LF("Screen covered %d%%", Int(value * 100)) }
         else { status = "Watching your head motion" }
     }
 
@@ -811,6 +811,13 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         if !screenPermission {
             NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")!)
         }
+    }
+
+    /// Saves the language choice and relaunches, since bundles resolve languages at launch.
+    func setLanguage(_ language: AppLanguage) {
+        guard language != AppLanguage.current else { return }
+        language.apply()
+        restartForScreenPermission()
     }
 
     func restartForScreenPermission() {

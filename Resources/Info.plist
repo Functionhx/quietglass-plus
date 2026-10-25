@@ -2,12 +2,19 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
 	<key>CFBundleDisplayName</key>
 	<string>QuietGlass</string>
 	<key>CFBundleExecutable</key>
 	<string>QuietGlass</string>
 	<key>CFBundleIdentifier</key>
 	<string>local.clinton.QuietGlass</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>zh-Hans</string>
+	</array>
 	<key>CFBundleName</key>
 	<string>QuietGlass</string>
 	<key>CFBundlePackageType</key>
@@ -16,16 +23,16 @@
 	<string>0.1.2</string>
 	<key>CFBundleVersion</key>
 	<string>3</string>
-	<key>NSHumanReadableCopyright</key>
-	<string>Copyright © Clinton Imaro. MIT License.</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>14.0</string>
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSCameraUsageDescription</key>
-	<string>QuietGlass uses the camera for camera head tracking, Nearby people, and optional owner recognition. Images stay on your Mac and are never saved. If you set up Recognize me, a face template is saved in this Mac’s Keychain.</string>
+	<string>QuietGlass uses the camera for camera head tracking, Nearby people, and optional face recognition. Images stay on your Mac and are never saved. Saved faces are stored as templates in this Mac’s Keychain.</string>
 	<key>NSHighResolutionCapable</key>
 	<true/>
+	<key>NSHumanReadableCopyright</key>
+	<string>Copyright © Clinton Imaro. MIT License.</string>
 	<key>NSMotionUsageDescription</key>
 	<string>QuietGlass uses AirPods head motion to cover your screen when you look away. Motion stays on your Mac.</string>
 </dict>

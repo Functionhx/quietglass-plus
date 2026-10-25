@@ -1,0 +1,2 @@
+"NSCameraUsageDescription" = "QuietGlass 使用摄像头进行头部追踪、“附近有人”检测和可选的面孔识别。画面只在本机处理，从不保存。已录入的面孔以模板形式保存在本机钥匙串中。";
+"NSMotionUsageDescription" = "QuietGlass 使用 AirPods 的头部运动数据，在你转开视线时遮挡屏幕。运动数据只在本机处理。";

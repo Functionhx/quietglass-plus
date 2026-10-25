@@ -493,6 +493,15 @@ private struct PrivacySettingsView: View {
 
     private var maintenanceSettings: some View {
         section("Everyday use") {
+            row("Language", detail: "QuietGlass relaunches to switch languages.") {
+                Picker("Language", selection: Binding(get: { AppLanguage.current }, set: { model.setLanguage($0) })) {
+                    ForEach(AppLanguage.allCases) { Text(verbatim: $0.title).tag($0) }
+                }
+                .labelsHidden()
+                .fixedSize()
+                .disabled(model.restarting)
+            }
+            divider
             row("Launch at login", detail: "Keep QuietGlass ready when you sign in to your Mac.") {
                 Toggle("Launch at login", isOn: Binding(get: { model.loginPreference.enabled }, set: { model.loginPreference.setEnabled($0) })).labelsHidden()
             }
@@ -758,7 +767,7 @@ private struct PrivacySettingsView: View {
             }
             ForEach(privacy.protectedAreas) { area in
                 divider
-                row("Area in \(area.window.name)", detail: "Follows the window when it moves or resizes.") {
+                row(LF("Area in %@", area.window.name), detail: "Follows the window when it moves or resizes.") {
                     Button("Remember") { privacy.rememberArea(area) }
                     Button("Remove") { privacy.removeArea(area.id) }
                         .accessibilityLabel("Remove area in \(area.window.name)")
@@ -773,7 +782,7 @@ private struct PrivacySettingsView: View {
             }
             ForEach(privacy.savedAreas) { area in
                 divider
-                row("Saved area in \(area.appName)", detail: "Restores when this app opens a window with the same title, including after relaunch.") {
+                row(LF("Saved area in %@", area.appName), detail: "Restores when this app opens a window with the same title, including after relaunch.") {
                     InlineDeleteButton(itemName: "saved area", confirmationHelp: "Forget this area and stop restoring its blur",
                                        isBusy: false, isDeleted: false,
                                        onConfirm: { privacy.removeSavedArea(area.id) }, onFinished: {})

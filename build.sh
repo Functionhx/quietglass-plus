@@ -54,6 +54,10 @@ if [[ "$quietglass_universal" == 1 ]]; then
     lipo "$quietglass_staged_app/Contents/MacOS/QuietGlass" -verify_arch arm64 x86_64
 fi
 cp Resources/Info.plist "$quietglass_staged_app/Contents/Info.plist"
+python3 scripts/gen-localization.py >/dev/null
+ditto Resources/zh-Hans.lproj "$quietglass_staged_app/Contents/Resources/zh-Hans.lproj"
+mkdir -p "$quietglass_staged_app/Contents/Resources/en.lproj"
+printf '/* English is the development language; keys are the English text. */\n' > "$quietglass_staged_app/Contents/Resources/en.lproj/Localizable.strings"
 cp LICENSE "$quietglass_staged_app/Contents/Resources/LICENSE.txt"
 cp Resources/Icons/LICENSE.md "$quietglass_staged_app/Contents/Resources/ThirdPartyNotices.txt"
 cat Resources/Models/SFace-LICENSE.txt >> "$quietglass_staged_app/Contents/Resources/ThirdPartyNotices.txt"

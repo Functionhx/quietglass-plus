@@ -219,7 +219,7 @@ final class NearbyPeople: ObservableObject {
         if let remaining = warningSecondsRemaining {
             let minutes = remaining / 60
             let seconds = String(format: "%02d", remaining % 60)
-            return "Blurs in \(minutes):\(seconds) · Esc to stop"
+            return LF("Blurs in %d:%@ · Esc to stop", minutes, seconds)
         }
         if canRetry { return "Open Settings to retry" }
         return "Look around · Esc to dismiss"
@@ -240,11 +240,11 @@ final class NearbyPeople: ObservableObject {
         switch status {
         case .off: return "Off"
         case .paused:
-            if let seconds = pauseSecondsRemaining { return String(format: "Paused · Resumes in %d:%02d", seconds / 60, seconds % 60) }
+            if let seconds = pauseSecondsRemaining { return LF("Paused · Resumes in %d:%02d", seconds / 60, seconds % 60) }
             return pauseReasons.contains(.protectionTest) ? "Paused during protection check" : "Paused while your Mac is inactive"
         case .requesting: return ownerRequired ? "Unlocking your saved face…" : "Waiting for camera access…"
         case .starting: return covered ? "Restarting camera · Blur stays on" : "Starting camera…"
-        case .unavailable(let failure): return failure.title + (covered ? " · Blur stays on" : " · Monitoring stopped")
+        case .unavailable(let failure): return L(failure.title) + L(covered ? " · Blur stays on" : " · Monitoring stopped")
         case .watching(let count):
             if ownerRequired {
                 return ownerNoticeTitle
