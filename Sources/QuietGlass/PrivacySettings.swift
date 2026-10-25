@@ -553,11 +553,57 @@ private struct PrivacySettingsView: View {
                     .disabled(model.nearby.owner.busy || model.nearby.owner.enrolling)
             }
             divider
+            row("Protection mode", detail: model.protectionMode == .away
+                ? "Only face detection runs while you work, and the camera turns off once the screen is covered. Press Esc to unlock when you are back."
+                : "Covers when you leave or another face appears, and clears when it recognizes a saved face.") {
+                Picker("Protection mode", selection: $model.protectionMode) {
+                    ForEach(ProtectionMode.allCases) { Text(verbatim: $0.title).tag($0) }
+                }
+                .labelsHidden()
+                .fixedSize()
+                .disabled(model.nearby.owner.busy || model.nearby.owner.enrolling)
+            }
+            divider
             row("Detect additional faces", detail: "Uses your camera while you work. AirPods are not required.") {
-                Toggle("Nearby people", isOn: Binding(get: { model.nearby.wantsMonitoring }, set: { model.setNearbyPeople($0) }))
+                Toggle("Nearby people", isOn: Binding(get: { model.cameraProtectionOn }, set: { model.setCameraProtection($0) }))
                     .labelsHidden()
                     .disabled(model.nearby.owner.busy || model.nearby.owner.enrolling)
             }
+            if model.protectionMode == .away {
+                divider
+                row("Cover after I leave for", detail: "Looking down or away briefly does not count.") {
+                    Picker("Cover after I leave for", selection: Binding(get: { model.away.delay }, set: { model.away.delay = $0 })) {
+                        ForEach([3.0, 5, 10, 30], id: \.self) { Text(LF("%d seconds", Int($0))).tag($0) }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                }
+                divider
+                row("Unlock with Touch ID", detail: "Esc alone could be pressed by anyone. With this on, Esc asks for Touch ID or your Mac password.") {
+                    Toggle("Unlock with Touch ID", isOn: Binding(get: { model.away.unlockRequiresAuthentication }, set: { model.away.unlockRequiresAuthentication = $0 })).labelsHidden()
+                }
+                divider
+                row("Cover style", detail: model.coverStyle.detail) {
+                    Picker("Cover style", selection: $model.coverStyle) {
+                        ForEach(CoverStyle.allCases.filter { $0 != .glass }) { Text($0.title).tag($0) }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                }
+                divider
+                row("Lock Mac when I’m away", detail: "A cover is not a lock. After this long covered with nobody in view, lock macOS too.") {
+                    Picker("Lock Mac when I’m away", selection: $model.autoLockMinutes) {
+                        Text("Never").tag(0)
+                        ForEach([1, 3, 5, 10, 30], id: \.self) { Text(LF("After %d min", $0)).tag($0) }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                }
+                if model.away.wantsMonitoring {
+                    divider
+                    row(model.away.status) { EmptyView() }
+                }
+            } else {
             divider
             row("Detection", detail: "Facing screen waits for a sustained head direction. Any extra face keeps the more cautious count-based response.") {
                 TrackingChoicePicker(label: "Nearby detection", options: NearbyDetection.allCases.map { ($0.rawValue, $0.title) },
@@ -694,6 +740,7 @@ private struct PrivacySettingsView: View {
                 divider
             }
             note("Detection works within your camera’s view. Facing screen estimates head direction, not eye gaze; unreadable faces can still trigger protection. Poor light, glasses, or an obstructed face can cause misses. Recognize me checks your saved face before clearing the response; without it, any steady single face can clear it. Recognition can be fooled by photos or video and does not replace locking your Mac. Camera images are never saved. Your detection setting is remembered, monitoring pauses while your Mac is inactive, and Escape turns it off.", finePrint: true)
+            }
         }
     }
 

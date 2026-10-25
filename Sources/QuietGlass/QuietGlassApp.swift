@@ -158,12 +158,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if Self.showsFloatingControls { notch.show() }
         // Settings opens on its own only until camera protection is set up, so a
         // login launch stays out of the way.
-        if !model.nearby.wantsMonitoring { privacySettings.show() }
+        if !model.cameraProtectionOn { privacySettings.show() }
         if UserDefaults.standard.bool(forKey: "showControlsAfterRelaunch") {
             UserDefaults.standard.removeObject(forKey: "showControlsAfterRelaunch")
             if Self.showsFloatingControls { notch.showControls() } else { privacySettings.show() }
         }
         model.nearby.restore()
+        model.away.restore()
         model.updates.checkIfDue()
     }
 

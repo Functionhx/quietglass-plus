@@ -6,6 +6,7 @@
 " · Try again" = " · 请重试";
 "%d faces in view" = "画面中有 %d 个人";
 "%d of 4 directions checked" = "已检查 %d/4 个方向";
+"%d seconds" = "%d 秒";
 ". Check the camera and try again." = "。请检查摄像头后重试。";
 "3-second warning, then 3-second blur." = "先提醒 3 秒，再模糊 3 秒。";
 "A cover is not a lock. After this long covered with nobody in view, lock macOS too." = "遮罩不等于锁屏。遮挡且画面中无人达到这个时长后，同时锁定 macOS。";
@@ -185,9 +186,13 @@
 "Could not change launch at login. Check Login Items in System Settings." = "无法更改登录时启动，请检查系统设置中的“登录项”。";
 "Could not check for updates. Check your connection and try again." = "无法检查更新，请检查网络后重试。";
 "Could not restart QuietGlass. Quit and reopen the app." = "无法重新启动 QuietGlass，请退出后重新打开。";
+"Cover after I leave for" = "离开多久后遮挡";
 "Cover style" = "遮挡效果";
+"Cover when I leave, unlock by keyboard" = "离开时遮挡，回来按键解锁";
 "Covered while motion is unavailable" = "运动数据不可用，保持遮挡";
 "Covered · " = "已遮挡 · ";
+"Covered · Camera off until you unlock" = "已遮挡 · 摄像头已关闭，解锁后恢复";
+"Covers when you leave or another face appears, and clears when it recognizes a saved face." = "离开或出现其他人时遮挡，认出已保存的面孔后自动解除。";
 "Create a rule for an app installed on your Mac." = "为本机已安装的 App 创建规则。";
 "Credentials and API keys" = "凭证和 API 密钥";
 "Current start angle" = "当前起始角度";
@@ -213,6 +218,7 @@
 "Edit warning duration" = "编辑提醒时长";
 "Email addresses" = "电子邮件地址";
 "Enter Full Screen" = "进入全屏幕";
+"Esc alone could be pressed by anyone. With this on, Esc asks for Touch ID or your Mac password." = "只按 Esc 的话谁都能解锁。开启后按 Esc 还需要 Touch ID 或 Mac 密码。";
 "Escape also removes all selected areas." = "按 Esc 也会移除所有所选区域。";
 "Escape is in use. Window protection could not start." = "Esc 已被占用，窗口保护无法启动。";
 "Escape is unavailable" = "Esc 不可用";
@@ -322,6 +328,7 @@
 "Look gently %@" = "请轻轻看向%@";
 "Looking away" = "视线已移开";
 "Looking away · Screen protected" = "视线已移开 · 屏幕已保护";
+"Looking down or away briefly does not count." = "短暂低头或转开视线不算离开。";
 "Lowest blur strength" = "最低模糊强度";
 "Maximum 24 hours" = "最多 24 小时";
 "Me" = "我";
@@ -360,6 +367,7 @@
 "Office" = "办公室";
 "On your Mac. No images saved." = "在本机处理，不保存图像。";
 "One face in view" = "画面中有一个人";
+"Only face detection runs while you work, and the camera turns off once the screen is covered. Press Esc to unlock when you are back." = "工作时只做最简单的人脸检测，屏幕一被遮挡就关闭摄像头。回来后按 Esc 解锁。最省电。";
 "Only faces inside the camera’s view can be detected." = "只能检测到摄像头视野内的面孔。";
 "Only people inside the camera’s view can be detected. Nearby monitoring pauses during a test and resumes when you close this check. Your saved warning delay stays unchanged. This checks coverage, not your identity." = "只能检测到摄像头视野内的人。测试期间“附近有人”监测会暂停，关闭测试后恢复。你保存的提醒设置不会改变。";
 "Only your face should be in view" = "画面中只能有你一个人";
@@ -399,6 +407,7 @@
 "Preferences" = "偏好设置";
 "Preparing blur · Esc to clear" = "正在准备模糊 · 按 Esc 清除";
 "Preparing privacy blur" = "正在准备隐私模糊";
+"Press Esc to unlock" = "按 Esc 解锁";
 "Press again to clear. Escape clears all protection." = "再按一次清除。Esc 会清除所有保护。";
 "Press keys…" = "请按下按键…";
 "Preview Blur for 5 Seconds" = "预览模糊 5 秒";
@@ -428,6 +437,7 @@
 "Protection active" = "保护已开启";
 "Protection check" = "保护测试";
 "Protection follows this window until you remove it or close it." = "保护会跟随此窗口，直到你移除或关闭它。";
+"Protection mode" = "保护方式";
 "Protection notice" = "保护提示";
 "Protection paused" = "保护已暂停";
 "Protection profile" = "保护情景模式";
@@ -460,6 +470,7 @@
 "Recalibrate…" = "重新校准…";
 "Recenter" = "重新居中";
 "Recognize me" = "识别我";
+"Recognize my face automatically" = "自动识别本人（自动遮挡和解除）";
 "Reconnecting screen blur…" = "正在重新连接屏幕模糊…";
 "Record your entire display to show the blur. A recording of one app window can bypass it." = "请录制整个显示器才能显示模糊，只录单个 App 窗口会绕过它。";
 "Redo" = "重做";
@@ -601,6 +612,7 @@
 "Undo" = "撤销";
 "Unlock with Touch ID" = "用 Touch ID 解锁";
 "Unlock your saved face to continue" = "解锁已保存的面孔以继续";
+"Unlock your screen." = "解锁屏幕。";
 "Unlocking your saved face…" = "正在解锁已保存的面孔…";
 "Update checking is temporarily unavailable. Try again later." = "暂时无法检查更新，请稍后再试。";
 "Use %d°" = "使用 %d°";
@@ -629,6 +641,7 @@
 "Warning delay hours" = "提醒延迟（小时）";
 "Warning delay minutes" = "提醒延迟（分钟）";
 "Warns beside the notch first, then blurs if the warning is still unresolved." = "先在刘海旁提醒，若仍未处理再模糊。";
+"Watching for you · covers after %d s away" = "正在检测 · 离开 %d 秒后遮挡";
 "Watching your head motion" = "正在监测头部动作";
 "Wear at least one AirPod, look at the screen, then click Center my gaze." = "至少戴上一只 AirPod，看向屏幕，然后点按“以当前视线为中心”。";
 "Wear your AirPods and connect them to this Mac. Setup continues when motion is ready." = "戴上 AirPods 并连接到这台 Mac，运动数据就绪后继续设置。";
@@ -637,6 +650,7 @@
 "You" = "你";
 "You can save up to %d faces. Delete one to add another." = "最多可保存 %d 张面孔，请先删除一张再添加。";
 "You have the newest available version." = "你使用的已是最新版本。";
+"You stepped away" = "你已离开";
 "You're ready" = "准备就绪";
 "Your app rules" = "你的 App 规则";
 "Your face is ready to save" = "面孔已就绪，可以保存";

@@ -98,6 +98,19 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
     private let headphones = HIDHeadTracker()
     private let overlay = ShieldOverlay()
     let cover = PrivacyCover()
+    /// "Cover when I leave" mode: detection only, manual unlock, camera off while covered.
+    let away = AwayMonitor()
+    private var awayObservation: AnyCancellable?
+    @Published var protectionMode = ProtectionMode.saved {
+        didSet {
+            guard protectionMode != oldValue else { return }
+            UserDefaults.standard.set(protectionMode.rawValue, forKey: ProtectionMode.preferenceKey)
+            // Carry the master switch over to the other mode.
+            let wasOn = oldValue == .away ? away.wantsMonitoring : nearby.wantsMonitoring
+            if oldValue == .away { away.setEnabled(false) } else { nearby.stop() }
+            if wasOn { setCameraProtection(true) }
+        }
+    }
     private var demoCovered = false
     /// Head tracking (AirPods, earbuds, camera) is turned away, shown with the capture-free cover.
     private var headCovered = false
@@ -200,8 +213,19 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
             self?.updateCover()
         }
         cover.includeInCaptures = demoMode
-        cover.badge.onUnlock = { [weak self] in self?.unlockCoverWithAuthentication() }
-        cover.badge.onExit = { [weak self] in self?.dismissShield() }
+        cover.badge.onUnlock = { [weak self] in
+            guard let self else { return }
+            if self.away.covered { self.unlockAway() } else { self.unlockCoverWithAuthentication() }
+        }
+        cover.badge.onExit = { [weak self] in
+            guard let self else { return }
+            if self.away.covered { self.unlockAway() } else { self.dismissShield() }
+        }
+        away.onCoverage = { [weak self] _ in self?.updateCover() }
+        awayObservation = away.objectWillChange.receive(on: RunLoop.main).sink { [weak self] _ in
+            self?.objectWillChange.send()
+            self?.refreshEscape()
+        }
         privacy.blurRadius = blur
         overlay.includeInCaptures = demoMode
         privacy.includeInCaptures = demoMode
@@ -212,6 +236,7 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         shortcuts.onEscape = { [weak self] in
             guard let self else { return }
             if self.headSetupActive { self.onCancelHeadSetup?() }
+            else if self.away.covered { self.unlockAway() }
             else if self.cover.isCovered && self.nearby.covered && self.nearby.owner.enabled {
                 // Escape used to clear everything. With Recognize me, a covered screen
                 // must not be dismissible by whoever is sitting at the keyboard.
@@ -274,10 +299,10 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         ]
         for (pause, resume, reason) in nearbyLifecycle {
             observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: pause, object: nil, queue: .main) { [weak self] _ in
-                Task { @MainActor in self?.nearby.suspend(for: reason); self?.pauseCamera(for: reason) }
+                Task { @MainActor in self?.nearby.suspend(for: reason); self?.away.suspend(for: reason); self?.pauseCamera(for: reason) }
             })
             observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: resume, object: nil, queue: .main) { [weak self] _ in
-                Task { @MainActor in self?.nearby.resume(after: reason); self?.resumeCamera(after: reason) }
+                Task { @MainActor in self?.nearby.resume(after: reason); self?.away.resume(after: reason); self?.resumeCamera(after: reason) }
             })
         }
         // Screen lock and screen saver keep the display on but nobody needs the camera.
@@ -287,16 +312,17 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         ]
         for (pause, resume, reason) in systemCovers {
             distributedObservers.append(DistributedNotificationCenter.default().addObserver(forName: .init(pause), object: nil, queue: .main) { [weak self] _ in
-                Task { @MainActor in self?.nearby.suspend(for: reason); self?.pauseCamera(for: reason) }
+                Task { @MainActor in self?.nearby.suspend(for: reason); self?.away.suspend(for: reason); self?.pauseCamera(for: reason) }
             })
             distributedObservers.append(DistributedNotificationCenter.default().addObserver(forName: .init(resume), object: nil, queue: .main) { [weak self] _ in
-                Task { @MainActor in self?.nearby.resume(after: reason); self?.resumeCamera(after: reason) }
+                Task { @MainActor in self?.nearby.resume(after: reason); self?.away.resume(after: reason); self?.resumeCamera(after: reason) }
             })
         }
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
                 self.nearby.resume(after: .systemSleep)
+                self.away.resume(after: .systemSleep)
                 self.resumeCamera(after: .systemSleep)
                 guard self.enabled else { return }
                 self.detail = "Look at your screen and recenter after waking your Mac."
@@ -347,7 +373,7 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
 
     /// A cover is not a lock: after a longer absence, lock macOS itself.
     private func updateAutoLock() {
-        let absent = autoLockMinutes > 0 && nearby.covered && nearby.status == .watching(0)
+        let absent = autoLockMinutes > 0 && (away.covered || (nearby.covered && nearby.status == .watching(0)))
         guard absent else { absentSince = nil; autoLockTimer?.invalidate(); autoLockTimer = nil; return }
         if absentSince == nil { absentSince = Date() }
         guard autoLockTimer == nil else { return }
@@ -368,16 +394,36 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
     /// Shows the capture-free cover for Nearby people / Recognize me and keeps its prompt current.
     func updateCover() {
         updateAutoLock()
-        let wanted = !coverStyle.usesScreenCapture && (nearby.covered || demoCovered || headCovered)
-        guard wanted else { cover.hide(); return }
-        let title = nearby.covered ? nearby.noticeTitle : headCovered ? L("Looking away") : L("Protection check")
-        let detail = nearby.owner.enabled && nearby.covered ? String(localized: "Look at the camera to unlock") : ""
+        // "Away" always uses the capture-free cover: the camera is off, nothing else runs.
+        let wanted = away.covered || (!coverStyle.usesScreenCapture && (nearby.covered || demoCovered || headCovered))
+        guard wanted else { cover.hide(); refreshEscape(); return }
+        let title = away.covered ? L("You stepped away") : nearby.covered ? nearby.noticeTitle : headCovered ? L("Looking away") : L("Protection check")
+        let detail = away.covered ? L("Press Esc to unlock") : nearby.owner.enabled && nearby.covered ? String(localized: "Look at the camera to unlock") : ""
         if cover.badge.title != title { cover.badge.title = title }
         if cover.badge.detail != detail { cover.badge.detail = detail }
-        let canUnlock = nearby.owner.enabled && nearby.covered
+        let canUnlock = away.covered ? away.unlockRequiresAuthentication : nearby.owner.enabled && nearby.covered
         if cover.badge.canUnlock != canUnlock { cover.badge.canUnlock = canUnlock }
         if cover.badge.canExit != !canUnlock { cover.badge.canExit = !canUnlock }
-        cover.show(style: coverStyle)
+        cover.show(style: coverStyle == .glass ? .fold : coverStyle)
+        refreshEscape()
+    }
+
+    /// Master switch for camera protection in the current mode.
+    var cameraProtectionOn: Bool { protectionMode == .away ? away.wantsMonitoring : nearby.wantsMonitoring }
+
+    func setCameraProtection(_ value: Bool) {
+        if protectionMode == .away {
+            if value { guard shortcuts.armEscape(true) else { privacyShortcutError = "Escape is unavailable. Nearby people could not start."; return } }
+            away.setEnabled(value)
+        } else { setNearbyPeople(value) }
+        refreshEscape()
+    }
+
+    /// Back at the Mac: Escape or the cover's button, then Touch ID if required.
+    func unlockAway() {
+        guard away.covered else { return }
+        if away.unlockRequiresAuthentication { authenticateThen("Unlock your screen.") { $0.away.unlock() } }
+        else { away.unlock() }
     }
 
     /// Fallback when the camera cannot recognize you (poor light, new glasses):
@@ -751,6 +797,7 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
     }
 
     @discardableResult private func applyCoverage(_ value: Double, direction: ShieldDirection, displays: [UInt32: Double]? = nil) -> Bool {
+        defer { refreshEscape() }
         // Capture-free styles cover the whole screen once you turn past the threshold;
         // the gradual, directional blur (and per-display coverage) needs screen capture.
         if !coverStyle.usesScreenCapture && displays == nil {
@@ -793,9 +840,14 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         refreshEscape()
     }
 
+    /// Escape is a global hotkey, which takes it away from every other app. Hold it only
+    /// while something is actually covering or blurring the screen; monitoring alone
+    /// (Nearby people, away mode, head tracking) leaves Escape to the frontmost app.
     private func refreshEscape() {
-        shortcuts.armEscape((enabled && trackingSource == .camera) || nearby.wantsMonitoring || privacy.wantsProtection || overlay.isCapturing || coverage > 0)
+        let visibleProtection = !privacy.paused && (privacy.selectedWindow != nil || !privacy.protectedAreas.isEmpty || privacy.focusEnabled || privacy.scanEnabled)
+        shortcuts.armEscape(cover.isCovered || coverage > 0 || privacy.fullScreen || visibleProtection || overlay.isCapturing)
     }
+
 
     func toggleInstantShield() {
         cancelLearning()
@@ -1039,6 +1091,7 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         invalidateDisplayCalibration()
         cancelLearning(message: "Calibration stopped while your Mac slept.")
         nearby.suspend(for: .systemSleep)
+        away.suspend(for: .systemSleep)
         pauseCamera(for: .systemSleep)
         privacy.dismissAll()
         motion.stopDeviceMotionUpdates()
