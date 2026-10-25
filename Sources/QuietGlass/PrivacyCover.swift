@@ -253,6 +253,24 @@ final class CoverSurface {
         } else { finish() }
     }
 
+    /// Live frosted glass keeps WindowServer recomputing the blur (~10% CPU). When
+    /// nobody is there to see it, settle on solid black and drop the blur.
+    func fadeToBlack() {
+        guard panel.isVisible, !effect.isHidden else { return }
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = dim.opacity
+        fade.toValue = 1
+        fade.duration = 1.2
+        CATransaction.begin()
+        CATransaction.setCompletionBlock { [weak self] in
+            Task { @MainActor in self?.effect.isHidden = true }
+        }
+        dim.opacity = 1
+        dim.add(fade, forKey: "toBlack")
+        stage.isHidden = true
+        CATransaction.commit()
+    }
+
     // MARK: Sheets
 
     private func configureSheets(for style: CoverStyle, size: CGSize) {
@@ -383,6 +401,22 @@ final class PrivacyCover {
     private var style = CoverStyle.fold
     private var surfaces: [CGDirectDisplayID: CoverSurface] = [:]
     private var keepAlive: Timer?
+    private var blackTimer: Timer?
+
+    /// Fade to black after `delay` seconds of being covered; nil cancels.
+    func fadeToBlack(after delay: TimeInterval?) {
+        guard let delay else { blackTimer?.invalidate(); blackTimer = nil; return }
+        guard isCovered, blackTimer == nil else { return }
+        let timer = Timer(timeInterval: delay, repeats: false) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, self.isCovered else { return }
+                for surface in self.surfaces.values { surface.fadeToBlack() }
+            }
+        }
+        timer.tolerance = 2
+        blackTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
 
     func show(style: CoverStyle) {
         let animated = !isCovered || style != self.style
@@ -409,6 +443,7 @@ final class PrivacyCover {
         guard isCovered else { return }
         isCovered = false
         keepAlive?.invalidate(); keepAlive = nil
+        blackTimer?.invalidate(); blackTimer = nil
         for surface in surfaces.values { surface.hide(animated: animated) }
     }
 

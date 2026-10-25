@@ -405,6 +405,8 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         if cover.badge.canUnlock != canUnlock { cover.badge.canUnlock = canUnlock }
         if cover.badge.canExit != !canUnlock { cover.badge.canExit = !canUnlock }
         cover.show(style: coverStyle == .glass ? .fold : coverStyle)
+        // Away: nobody is watching and the camera is off; stop the live blur too.
+        cover.fadeToBlack(after: away.covered ? 15 : nil)
         refreshEscape()
     }
 
