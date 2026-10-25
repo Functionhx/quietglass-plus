@@ -199,7 +199,7 @@
 "Delete a saved QuietGlass face." = "删除一张已保存的 QuietGlass 面孔。";
 "Delete your saved QuietGlass face." = "删除已保存的 QuietGlass 面孔。";
 "Details" = "详细信息";
-"Detect additional faces" = "检测其他面孔";
+"Detect additional faces" = "摄像头自动保护（总开关）";
 "Detected" = "已检测到";
 "Detected regions" = "检测到的区域";
 "Detection" = "检测方式";
@@ -610,7 +610,7 @@
 "Use your camera to blur when you turn away. Start tracking to calibrate." = "转头离开时用摄像头触发模糊。开始追踪以进行校准。";
 "Use your saved face for this QuietGlass session." = "在本次 QuietGlass 会话中使用已保存的面孔。";
 "Uses head direction, not eye gaze or Apple Face ID. Brief glances are ignored. Tracking loss keeps a calibrated screen protected. Frames stay on your Mac and are never saved." = "使用头部朝向判断，不是眼睛视线，也不是 Apple 面容 ID。短暂瞥视会被忽略；校准后追踪丢失时屏幕保持保护。画面只在本机处理。";
-"Uses your camera while you work. AirPods are not required." = "工作时使用摄像头，无需 AirPods。";
+"Uses your camera while you work. AirPods are not required." = "总开关：开启后用摄像头判断离开、陌生人和多人，并自动遮挡。无需 AirPods。";
 "Using your own blur strength and sensitivity." = "使用你自定义的模糊强度和灵敏度。";
 "View" = "显示";
 "View download" = "查看下载";

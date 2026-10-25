@@ -100,7 +100,7 @@ T = {
 "One face in view": "画面中有一个人", "Face the camera again": "请再次面向摄像头",
 "Choose the camera with the best view of you and the people beside you.": "选择最能拍到你和身边人的摄像头。",
 "Test my protection": "测试我的保护", "Preview camera coverage, check both sides, and try your warning or blur.": "预览摄像头覆盖范围、检查两侧，并试用提醒或模糊效果。",
-"Run check": "开始测试", "Detect additional faces": "检测其他面孔", "Uses your camera while you work. AirPods are not required.": "工作时使用摄像头，无需 AirPods。",
+"Run check": "开始测试", "Detect additional faces": "摄像头自动保护（总开关）", "Uses your camera while you work. AirPods are not required.": "总开关：开启后用摄像头判断离开、陌生人和多人，并自动遮挡。无需 AirPods。",
 "Detection": "检测方式", "Nearby detection": "附近检测",
 "Facing screen waits for a sustained head direction. Any extra face keeps the more cautious count-based response.": "“面向屏幕时”会等待对方持续朝向屏幕；“任何多余面孔”按人数判断，更为谨慎。",
 "Warns beside the notch first, then blurs if the warning is still unresolved.": "先在刘海旁提醒，若仍未处理再模糊。",

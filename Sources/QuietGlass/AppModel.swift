@@ -17,9 +17,15 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
     @Published private(set) var connected = false
     @Published private(set) var calibrated = false
     @Published private(set) var coverage = 0.0
+    /// Live head position for the setup and settings views, at most 5 Hz. Head motion
+    /// arrives at 25-30 Hz; publishing every sample re-rendered Settings and the notch
+    /// bar each time (~30% CPU). Shield decisions use `liveOffset` at full rate.
     @Published private(set) var offset = HeadOffset(yaw: 0, pitch: 0)
-    @Published private(set) var status = "Ready when you are"
-    @Published private(set) var detail = "Connect your AirPods to this Mac, then start head tracking."
+    private var liveOffset = HeadOffset(yaw: 0, pitch: 0)
+    private var offsetPublished: TimeInterval = 0
+    // Assigned on every motion sample; only notify views when the text changes.
+    private(set) var status = "Ready when you are" { willSet { if newValue != status { objectWillChange.send() } } }
+    private(set) var detail = "Connect your AirPods to this Mac, then start head tracking." { willSet { if newValue != detail { objectWillChange.send() } } }
     @Published private(set) var captureNotice: String?
     @Published private(set) var screenPermission = CGPreflightScreenCaptureAccess()
     @Published private(set) var restarting = false
@@ -512,7 +518,7 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         guard enabled, trackingSource == .camera else { return }
         connected = cameraTracking.policy.hasFace
         calibrated = cameraTracking.policy.calibrated
-        offset = cameraTracking.policy.offset
+        setOffset(cameraTracking.policy.offset)
         detail = cameraTracking.message
         objectWillChange.send()
         updateShield()
@@ -637,8 +643,8 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         if pendingCalibration { recenter() }
         if let center, let latest, now - lastPublished > 1.0 / 30 {
             lastPublished = now
-            offset = headOffset(center: center, current: latest)
-            if learning { calibration.record(angle: offset.angle) }
+            setOffset(headOffset(center: center, current: latest))
+            if learning { calibration.record(angle: liveOffset.angle) }
             updateShield()
         } else if center == nil {
             updateShield()
@@ -665,7 +671,7 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         everCalibrated = true
         pendingCalibration = false
         dismissedForLoss = false
-        offset = HeadOffset(yaw: 0, pitch: 0)
+        setOffset(HeadOffset(yaw: 0, pitch: 0), force: true)
         response.recenter()
         stopPreview()
         clearOverlay()
@@ -730,13 +736,13 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
             let values = displayTracking.coverage(current: latest, displays: connectedDisplays.map(\.id),
                                                   comfort: settings.comfort, transition: settings.transition)
             let maximum = values.values.max() ?? 0
-            guard applyCoverage(maximum, direction: .from(offset), displays: values) else { return }
+            guard applyCoverage(maximum, direction: .from(liveOffset), displays: values) else { return }
             status = displayCalibrationIDs.isEmpty ? "Center each display to use display tracking" : "Protecting displays you turn away from"
             return
         }
-        let value = response.coverage(angle: offset.angle)
+        let value = response.coverage(angle: liveOffset.angle)
         if !response.dismissedUntilCentered { dismissedForLoss = false }
-        guard applyCoverage(value, direction: .from(offset)) else { return }
+        guard applyCoverage(value, direction: .from(liveOffset)) else { return }
         if response.dismissedUntilCentered { status = "Shield dismissed until you face center" }
         else if value > 0.001 { status = LF("Screen covered %d%%", Int(value * 100)) }
         else { status = "Watching your head motion" }
@@ -862,7 +868,7 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
             dismissedForLoss = snapshot.dismissedForLoss
             response = snapshot.response
             refreshResponse()
-            if let center, let latest { offset = headOffset(center: center, current: latest) }
+            if let center, let latest { setOffset(headOffset(center: center, current: latest), force: true) }
         } else {
             comfort = snapshot.comfort
             stop()
@@ -1065,6 +1071,15 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         detail = trackingSource == .headphones ? "Headphones disconnected. Face the screen and recenter after reconnecting."
             : "AirPods disconnected. Face the screen and recenter after reconnecting."
         updateShield()
+    }
+
+    private func setOffset(_ value: HeadOffset, force: Bool = false) {
+        liveOffset = value
+        let now = ProcessInfo.processInfo.systemUptime
+        let moved = abs(value.yaw - offset.yaw) >= 0.5 || abs(value.pitch - offset.pitch) >= 0.5
+        guard force || (moved && now - offsetPublished >= 0.2) else { return }
+        offsetPublished = now
+        offset = value
     }
 
     /// Earbud sensor frames are tilted in the ear; measure the total turn instead.
