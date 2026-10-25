@@ -130,6 +130,7 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
     private var distributedObservers: [NSObjectProtocol] = []
     private var absentSince: Date?
     private let peekAlert = PeekAlert()
+    private let postureAlert = PeekAlert()
     /// "Blur until they look away" is showing; Exit suppresses it for a minute.
     private var peekCovered = false
     private var peekSuppressedUntil = Date.distantPast
@@ -230,6 +231,14 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         }
         away.onCoverage = { [weak self] _ in self?.updateCover() }
         away.onOnlooker = { [weak self] watching in self?.updateOnlooker(watching) }
+        away.onPosture = { [weak self] issue in
+            guard let self, !self.away.covered, !self.away.onlooker else { return }
+            switch issue {
+            case .tooClose: self.postureAlert.flash(symbol: "arrow.up.backward.and.arrow.down.forward", text: "Posture: you're very close to the screen")
+            case .slouching: self.postureAlert.flash(symbol: "figure.seated.side", text: "Posture: sit up a little")
+            case .headTilt: self.postureAlert.flash(symbol: "level", text: "Posture: your head is tilted")
+            }
+        }
         awayObservation = away.objectWillChange.receive(on: RunLoop.main).sink { [weak self] _ in
             self?.objectWillChange.send()
             self?.refreshEscape()

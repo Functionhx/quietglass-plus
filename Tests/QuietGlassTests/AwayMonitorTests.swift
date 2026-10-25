@@ -99,6 +99,27 @@ private final class FakeCamera: NearbyCameraSession {
         XCTAssertFalse(monitor.covered, "A peek alert never counts as away")
     }
 
+    func testCalibratedPostureRemindsWhenLeaningIn() async throws {
+        try XCTSkipIf(AVCaptureAuthorization.denied, "camera access denied for the test runner")
+        let monitor = makeMonitor()
+        var issues: [PostureIssue] = []
+        monitor.onPosture = { issues.append($0) }
+        monitor.postureHold = 2
+        monitor.setEnabled(true)
+        await wait { !self.cameras.isEmpty }
+        let upright = CameraFace(bounds: CGRect(x: 0.35, y: 0.3, width: 0.3, height: 0.4), yaw: 0, pitch: 0, roll: 0)
+        let close = CameraFace(bounds: CGRect(x: 0.25, y: 0.2, width: 0.44, height: 0.58), yaw: 0, pitch: 0, roll: 0)
+        monitor.calibratePosture()
+        for _ in 0..<6 { await send(faces: [upright]) }
+        XCTAssertTrue(monitor.postureCalibrated)
+        XCTAssertFalse(monitor.calibratingPosture)
+        for _ in 0..<4 { await send(faces: [close]) }    // 1 s
+        XCTAssertTrue(issues.isEmpty)
+        for _ in 0..<6 { await send(faces: [close]) }    // past 2 s
+        XCTAssertEqual(issues, [.tooClose])
+        XCTAssertFalse(monitor.covered)
+    }
+
     func testPeekAlertOffIgnoresOnlookers() async throws {
         try XCTSkipIf(AVCaptureAuthorization.denied, "camera access denied for the test runner")
         let monitor = makeMonitor()

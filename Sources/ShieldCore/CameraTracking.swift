@@ -5,8 +5,10 @@ public struct CameraFace: Equatable {
     public let bounds: CGRect
     public let yaw: Double?
     public let pitch: Double?
-    public init(bounds: CGRect, yaw: Double?, pitch: Double?) {
-        self.bounds = bounds; self.yaw = yaw; self.pitch = pitch
+    /// Head tilt toward a shoulder, radians (used by the posture reminder).
+    public let roll: Double?
+    public init(bounds: CGRect, yaw: Double?, pitch: Double?, roll: Double? = nil) {
+        self.bounds = bounds; self.yaw = yaw; self.pitch = pitch; self.roll = roll
     }
     public var valid: Bool {
         !bounds.isEmpty && !bounds.isNull && [bounds.minX, bounds.minY, bounds.width, bounds.height].allSatisfy(\.isFinite) &&

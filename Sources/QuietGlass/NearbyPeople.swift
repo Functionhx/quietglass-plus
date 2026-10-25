@@ -831,7 +831,7 @@ final class FaceCamera: NSObject, NearbyCameraSession, AVCaptureVideoDataOutputS
                 }
                 var sample = NearbyFaceSample(count: faces.count, capturedAt: now, bounds: faces.map(\.boundingBox))
                 sample.people = people
-                sample.faces = faces.map { CameraFace(bounds: $0.boundingBox, yaw: $0.yaw?.doubleValue, pitch: $0.pitch?.doubleValue) }
+                sample.faces = faces.map { CameraFace(bounds: $0.boundingBox, yaw: $0.yaw?.doubleValue, pitch: $0.pitch?.doubleValue, roll: $0.roll?.doubleValue) }
                 if recognition {
                     guard let recognizer else { throw OwnerModelError.unavailable }
                     sample.identities = try faces.map { face in

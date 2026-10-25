@@ -1,12 +1,27 @@
 import AppKit
 import SwiftUI
 
-/// Honor-style "someone is looking at your screen" pill below the notch. It never
-/// takes focus or clicks, and it is hidden from screen sharing and recordings.
+final class PillContent: ObservableObject {
+    @Published var symbol = "eyes"
+    @Published var text: LocalizedStringKey = "Someone is looking at your screen"
+    @Published var urgent = true
+}
+
+/// A pill below the notch: the Honor-style "someone is looking at your screen" alert and
+/// posture reminders. It never takes focus or clicks, and is hidden from screen sharing.
 @MainActor
 final class PeekAlert {
     private var panel: NSPanel?
     var includeInCaptures = false
+    let content = PillContent()
+
+    /// Shows a one-off message, then hides it.
+    func flash(symbol: String, text: LocalizedStringKey, for seconds: TimeInterval = 6) {
+        content.symbol = symbol; content.text = text; content.urgent = false
+        panel = nil // re-measure for the new text
+        show()
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds) { [weak self] in self?.hide() }
+    }
 
     func show() {
         let panel = self.panel ?? makePanel()
@@ -33,7 +48,7 @@ final class PeekAlert {
     }
 
     private func makePanel() -> NSPanel {
-        let host = NSHostingView(rootView: PeekPill())
+        let host = NSHostingView(rootView: PeekPill(content: content))
         let size = host.fittingSize
         let panel = NSPanel(contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         panel.level = .statusBar
@@ -50,15 +65,18 @@ final class PeekAlert {
 }
 
 private struct PeekPill: View {
+    @ObservedObject var content: PillContent
     @State private var pulse = false
     var body: some View {
         HStack(spacing: 10) {
-            ZStack {
-                Circle().fill(Color.red.opacity(0.35)).frame(width: 18, height: 18).scaleEffect(pulse ? 1.25 : 0.8).opacity(pulse ? 0 : 1)
-                Circle().fill(Color.red).frame(width: 8, height: 8)
+            if content.urgent {
+                ZStack {
+                    Circle().fill(Color.red.opacity(0.35)).frame(width: 18, height: 18).scaleEffect(pulse ? 1.25 : 0.8).opacity(pulse ? 0 : 1)
+                    Circle().fill(Color.red).frame(width: 8, height: 8)
+                }
             }
-            Image(systemName: "eyes").font(.system(size: 15, weight: .semibold))
-            Text("Someone is looking at your screen").font(.system(size: 14, weight: .semibold))
+            Image(systemName: content.symbol).font(.system(size: 15, weight: .semibold))
+            Text(content.text).font(.system(size: 14, weight: .semibold))
                 .lineLimit(1).fixedSize()
         }
         .fixedSize()

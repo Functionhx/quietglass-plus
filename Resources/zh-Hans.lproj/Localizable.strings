@@ -92,8 +92,10 @@
 "Blurs in %d:%@ · Esc to stop" = "%d:%@ 后模糊 · 按 Esc 停止";
 "Both sides detected. People outside this view cannot be seen." = "两侧都已检测到。视野外的人无法被看到。";
 "Bring the window you want to protect into view, then choose an area again." = "让要保护的窗口显示出来，然后重新选择区域。";
+"Calibrate" = "校准";
 "Calibrate each display to keep the one you face clear and blur the others." = "为每台显示器校准，使你面对的那台保持清晰，其余模糊。";
 "Calibrate your start angle" = "校准起始角度";
+"Calibrated. Recalibrate if you move your Mac or chair." = "已校准。挪动电脑或椅子后请重新校准。";
 "Calibration progress" = "校准进度";
 "Calibration stopped while your Mac slept." = "Mac 睡眠时校准已停止。";
 "Camera" = "摄像头";
@@ -291,8 +293,10 @@
 "Hold still while your position is calibrated…" = "正在校准位置，请保持不动…";
 "Hold to peek" = "按住偷看";
 "Hold to peek is in use by another app. Escape still clears the shield." = "“按住偷看”快捷键已被其他 App 占用。Esc 仍可清除遮挡。";
+"Hold your usual good posture for three seconds…" = "请保持你平时端正的坐姿 3 秒…";
 "Home" = "家里";
 "Hover to reveal controls, or right-click for settings" = "悬停以显示控制项，或右键打开设置";
+"How long a posture must last before a reminder. Each reminder repeats at most every 10 minutes." = "姿势不对持续多久才提醒。同一种提醒 10 分钟内最多一次。";
 "Hr." = "小时";
 "Include Command, Control, or Option in your shortcut." = "快捷键需包含 Command、Control 或 Option。";
 "Include blur in screenshots and recordings of your entire display." = "在整屏截图和录制中包含模糊效果。";
@@ -370,6 +374,7 @@
 "No photos or video are saved. Your face template is encrypted in Keychain and can be deleted in Settings. Recognition can make mistakes or be fooled by a photo or video. Lock your Mac when you leave it." = "不会保存任何照片或视频。面孔模板加密存放在钥匙串中，可在设置里删除。识别可能出错，也可能被照片或视频欺骗。离开时请锁定你的 Mac。";
 "No public release is available to check yet." = "目前还没有可检查的公开版本。";
 "No visible window is available for %@." = "%@ 没有可见的窗口。";
+"Not calibrated yet: your first minute becomes the reference." = "尚未校准：会以开启后第一分钟的坐姿作为标准。";
 "Not checked" = "未检查";
 "Now ask them to enter from the right." = "现在请对方从右侧进入。";
 "Off" = "关闭";
@@ -414,6 +419,10 @@
 "Phrases to protect" = "要保护的短语";
 "Play warning sound" = "播放提醒音效";
 "Plays a short sound once when a warning appears beside the notch." = "刘海旁出现提醒时播放一次短音效。";
+"Posture reminders" = "坐姿提醒";
+"Posture: sit up a little" = "坐姿提醒：坐直一点";
+"Posture: you're very close to the screen" = "坐姿提醒：离屏幕太近了";
+"Posture: your head is tilted" = "坐姿提醒：头歪了";
 "Preferences" = "偏好设置";
 "Preparing blur · Esc to clear" = "正在准备模糊 · 按 Esc 清除";
 "Preparing privacy blur" = "正在准备隐私模糊";
@@ -491,6 +500,7 @@
 "Relaunch to apply" = "重新启动后生效";
 "Release the shortcut to blur your screen again." = "松开快捷键屏幕会再次模糊。";
 "Remember" = "记住";
+"Remind after" = "持续多久后提醒";
 "Remove" = "移除";
 "Remove all areas" = "移除所有区域";
 "Remove area" = "移除区域";
@@ -603,6 +613,7 @@
 "The recenter shortcut is in use. Record a different one." = "重新居中快捷键已被占用，请录制其他组合。";
 "The recognition model is unavailable. Reinstall QuietGlass; protection will stay on." = "识别模型不可用，请重新安装 QuietGlass；保护会保持开启。";
 "The release information could not be verified." = "无法验证版本信息。";
+"This is how I sit" = "以现在的坐姿为标准";
 "This window has no readable title. Keep the area selected for this session instead." = "此窗口没有可读的标题，请仅在本次会话中保留所选区域。";
 "Time to respond before automatic blur. Clearing the alert cancels the timer; Escape stops monitoring." = "自动模糊前的反应时间。处理提醒会取消计时；按 Esc 停止监测。";
 "Toggle Sidebar" = "切换边栏";
@@ -638,6 +649,7 @@
 "Use your camera to blur when you turn away. Start tracking to calibrate." = "转头离开时用摄像头触发模糊。开始追踪以进行校准。";
 "Use your saved face for this QuietGlass session." = "在本次 QuietGlass 会话中使用已保存的面孔。";
 "Uses head direction, not eye gaze or Apple Face ID. Brief glances are ignored. Tracking loss keeps a calibrated screen protected. Frames stay on your Mac and are never saved." = "使用头部朝向判断，不是眼睛视线，也不是 Apple 面容 ID。短暂瞥视会被忽略；校准后追踪丢失时屏幕保持保护。画面只在本机处理。";
+"Uses the same camera frames, no extra power. Reminds you after a while of leaning in, slumping or tilting your head; never covers the screen." = "复用同一路摄像头画面，不额外耗电。前倾、驼背或歪头持续一段时间后提醒你，不会遮挡屏幕。";
 "Uses your camera while you work. AirPods are not required." = "总开关：开启后用摄像头判断离开、陌生人和多人，并自动遮挡。无需 AirPods。";
 "Using your own blur strength and sensitivity." = "使用你自定义的模糊强度和灵敏度。";
 "View" = "显示";

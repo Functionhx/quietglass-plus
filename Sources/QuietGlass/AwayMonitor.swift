@@ -69,6 +69,18 @@ final class AwayMonitor: ObservableObject {
         didSet { preferences.set(peekResponse.rawValue, forKey: "peekResponse"); if peekResponse == .off { setOnlooker(false) } }
     }
     var onOnlooker: ((Bool) -> Void)?
+    /// Gentle reminders when you lean in, slump or tilt your head for a while.
+    @Published var postureReminders: Bool {
+        didSet { preferences.set(postureReminders, forKey: "postureReminders"); posture.reset() }
+    }
+    @Published var postureHold: TimeInterval {
+        didSet { preferences.set(postureHold, forKey: "postureHold"); posture.hold = postureHold }
+    }
+    @Published private(set) var postureCalibrated: Bool
+    @Published private(set) var calibratingPosture = false
+    var onPosture: ((PostureIssue) -> Void)?
+    private var posture: PosturePolicy
+    private var calibrationFaces: [CameraFace] = []
     private var attention = NearbyAttentionPolicy()
     private var onlookerClearedSince: TimeInterval?
     private var rate = 2.0
@@ -100,6 +112,14 @@ final class AwayMonitor: ObservableObject {
         unlockRequiresAuthentication = preferences.object(forKey: "awayUnlockRequiresAuth") as? Bool ?? true
         graceSeconds = preferences.object(forKey: "awayGrace") as? Double ?? 60
         peekResponse = PeekResponse(rawValue: preferences.string(forKey: "peekResponse") ?? "") ?? .alert
+        postureReminders = preferences.object(forKey: "postureReminders") as? Bool ?? true
+        let hold = preferences.object(forKey: "postureHold") as? Double ?? 60
+        postureHold = hold
+        let saved = preferences.data(forKey: "postureBaseline").flatMap { try? JSONDecoder().decode(PostureBaseline.self, from: $0) }
+        var posture = PosturePolicy(baseline: saved)
+        posture.hold = hold
+        self.posture = posture
+        postureCalibrated = saved != nil
         wantsMonitoring = preferences.bool(forKey: "awayEnabled")
     }
 
@@ -190,6 +210,39 @@ final class AwayMonitor: ObservableObject {
         if recent.count > 40 { recent.removeFirst(recent.count - 40) }
         if policy.observe(faceCount: people, at: sample.capturedAt) { becameAway(stalled: false); return }
         observeOnlookers(sample)
+        observePosture(sample)
+    }
+
+    /// Uses the largest face: yours, at the keyboard.
+    private func observePosture(_ sample: NearbyFaceSample) {
+        let face = sample.faces?.max { $0.bounds.height < $1.bounds.height }
+        if calibratingPosture {
+            if let face { calibrationFaces.append(face) }
+            if calibrationFaces.count >= 6, let baseline = PosturePolicy.baseline(from: calibrationFaces) {
+                posture = PosturePolicy(baseline: baseline); posture.hold = postureHold
+                preferences.set(try? JSONEncoder().encode(baseline), forKey: "postureBaseline")
+                postureCalibrated = true
+                calibratingPosture = false
+                logger.notice("Posture calibrated")
+            }
+            return
+        }
+        guard postureReminders, !onlooker else { return }
+        let hadBaseline = posture.baseline != nil
+        if let issue = posture.observe(face, at: sample.capturedAt) {
+            logger.notice("Posture reminder: \(issue.rawValue, privacy: .public)")
+            onPosture?(issue)
+        }
+        if !hadBaseline, let learned = posture.baseline {
+            preferences.set(try? JSONEncoder().encode(learned), forKey: "postureBaseline")
+            postureCalibrated = true
+        }
+    }
+
+    /// "This is how I sit": the next three seconds become the posture baseline.
+    func calibratePosture() {
+        calibrationFaces.removeAll()
+        calibratingPosture = true
     }
 
     /// Reuses upstream's facing-screen policy: an extra face must face the screen for a

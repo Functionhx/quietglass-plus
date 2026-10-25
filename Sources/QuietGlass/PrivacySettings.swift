@@ -587,6 +587,29 @@ private struct PrivacySettingsView: View {
                     .fixedSize()
                 }
                 divider
+                row("Posture reminders", detail: "Uses the same camera frames, no extra power. Reminds you after a while of leaning in, slumping or tilting your head; never covers the screen.") {
+                    Toggle("Posture reminders", isOn: Binding(get: { model.away.postureReminders }, set: { model.away.postureReminders = $0 })).labelsHidden()
+                }
+                if model.away.postureReminders {
+                    divider
+                    row("This is how I sit", detail: model.away.calibratingPosture ? "Hold your usual good posture for three seconds…"
+                        : model.away.postureCalibrated ? "Calibrated. Recalibrate if you move your Mac or chair." : "Not calibrated yet: your first minute becomes the reference.") {
+                        Button(model.away.postureCalibrated ? "Recalibrate" : "Calibrate") { model.away.calibratePosture() }
+                            .disabled(model.away.calibratingPosture || !model.away.watching)
+                    }
+                    divider
+                    row("Remind after", detail: "How long a posture must last before a reminder. Each reminder repeats at most every 10 minutes.") {
+                        Picker("Remind after", selection: Binding(get: { model.away.postureHold }, set: { model.away.postureHold = $0 })) {
+                            Text(LF("%d seconds", 30)).tag(30.0)
+                            Text(LF("%d min", 1)).tag(60.0)
+                            Text(LF("%d min", 2)).tag(120.0)
+                            Text(LF("%d min", 5)).tag(300.0)
+                        }
+                        .labelsHidden()
+                        .fixedSize()
+                    }
+                }
+                divider
                 row("Any key unlocks for", detail: "Right after the screen covers, any key unlocks it. After this time, unlocking needs Touch ID or your Mac password.") {
                     Picker("Any key unlocks for", selection: Binding(get: { model.away.graceSeconds }, set: { model.away.graceSeconds = $0 })) {
                         Text("Off").tag(0.0)
