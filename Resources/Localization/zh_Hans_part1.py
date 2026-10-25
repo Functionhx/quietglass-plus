@@ -68,6 +68,10 @@ T = {
 "Anyone saved here can clear protection. Stored in this Mac’s Keychain; Touch ID or your Mac password is required to add, delete or use them.":
     "这里保存的任何人都能解除保护。数据存放在本机钥匙串中；添加、删除或使用都需要 Touch ID 或 Mac 密码。",
 "Saved faces aren’t onlookers": "已保存的人不算旁观者",
+"Ask for a head turn to unlock": "恢复时要求转头确认",
+"A small turn before clearing makes a photo harder to use. Right after you unlock your Mac, your face alone is enough.": "解除遮挡前轻轻转一下头，可以防止用照片冒充。刚解锁 Mac 后，只需认出你的脸即可。",
+"Lock Mac when I’m away": "离开后锁定 Mac", "A cover is not a lock. After this long covered with nobody in view, lock macOS too.": "遮罩不等于锁屏。遮挡且画面中无人达到这个时长后，同时锁定 macOS。",
+"Never": "永不", "After %d min": "%d 分钟后",
 "When everyone in view is saved, the screen stays clear. Turn off to cover whenever a second face appears.":
     "画面中所有人都已保存时，屏幕保持清晰。关闭后，只要出现第二张面孔就会遮挡。",
 "Set up my face": "录入我的面孔",

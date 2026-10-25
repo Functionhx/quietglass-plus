@@ -42,3 +42,47 @@ final class FaceProfilesTests: XCTestCase {
         XCTAssertNil(FaceProfiles.decode(Data("{}".utf8)))
     }
 }
+
+final class OwnerQuickClearTests: XCTestCase {
+    private let center = OwnerPose(yaw: 0, eyes: 0.3)
+
+    func testMatchingFaceClearsWithoutMovementCheckDuringQuickClearWindow() {
+        var presence = OwnerPresence(turnPositive: true)
+        presence.allowQuickClear(until: 10)
+        presence.observe(matches: false, pose: nil, openEyes: 0.3, at: 1.0) // camera warming up, nobody yet
+        XCTAssertTrue(presence.covered)
+        presence.observe(matches: true, pose: center, openEyes: 0.3, at: 1.1)
+        presence.observe(matches: true, pose: center, openEyes: 0.3, at: 1.3)
+        XCTAssertTrue(presence.covered, "Needs 0.4 s of consecutive matches")
+        presence.observe(matches: true, pose: center, openEyes: 0.3, at: 1.6)
+        XCTAssertFalse(presence.covered)
+    }
+
+    func testMismatchRestartsTheHoldAndExpiredWindowRequiresMovementCheck() {
+        var presence = OwnerPresence(turnPositive: true)
+        presence.allowQuickClear(until: 2)
+        presence.observe(matches: true, pose: center, openEyes: 0.3, at: 1.0)
+        presence.observe(matches: false, pose: center, openEyes: 0.3, at: 1.2)
+        presence.observe(matches: true, pose: center, openEyes: 0.3, at: 1.3)
+        presence.observe(matches: true, pose: center, openEyes: 0.3, at: 1.6)
+        XCTAssertTrue(presence.covered, "A stranger frame must restart the hold")
+        for t in stride(from: 2.1, through: 4.0, by: 0.1) {
+            presence.observe(matches: true, pose: center, openEyes: 0.3, at: t)
+        }
+        XCTAssertTrue(presence.covered, "After the window, holding still is not enough")
+        XCTAssertEqual(presence.challenge.stage, .turn)
+    }
+}
+
+final class OwnerStartVerifiedTests: XCTestCase {
+    func testStartsClearAfterSystemUnlockButCoversAStranger() {
+        var presence = OwnerPresence(turnPositive: true)
+        presence.startVerified()
+        XCTAssertFalse(presence.covered)
+        presence.observe(matches: true, pose: OwnerPose(yaw: 0, eyes: 0.3), openEyes: 0.3, at: 1.0)
+        XCTAssertFalse(presence.covered)
+        presence.observe(matches: false, pose: OwnerPose(yaw: 0, eyes: 0.3), openEyes: 0.3, at: 1.2)
+        presence.observe(matches: false, pose: OwnerPose(yaw: 0, eyes: 0.3), openEyes: 0.3, at: 1.6)
+        XCTAssertTrue(presence.covered, "Someone else at the keyboard still covers")
+    }
+}

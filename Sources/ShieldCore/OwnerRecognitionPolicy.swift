@@ -128,7 +128,24 @@ public struct OwnerPresence {
     public init(turnPositive: Bool) { challenge = OwnerChallenge(turnPositive: turnPositive) }
     private var recoveryUntil: TimeInterval?
     private var recoverySince: TimeInterval?
+    private var quickClearUntil: TimeInterval?
+    private var quickClearSince: TimeInterval?
     public var recoveringLandmarks: Bool { recoveryUntil != nil }
+
+    /// Until `time`, a matching face held for 0.4 s clears protection without the
+    /// movement check. Used right after macOS itself authenticated the user (unlock,
+    /// wake), or always when the user turns the movement check off.
+    /// Starts clear because macOS has just authenticated the user (screen unlock). Any
+    /// sustained mismatch or absence still covers after the usual 0.35 s.
+    public mutating func startVerified() {
+        covered = false
+        missingSince = nil
+    }
+
+    public mutating func allowQuickClear(until time: TimeInterval) {
+        quickClearUntil = time
+        quickClearSince = nil
+    }
 
     public mutating func interrupt(turnPositive: Bool) {
         self = OwnerPresence(turnPositive: turnPositive)
@@ -151,6 +168,7 @@ public struct OwnerPresence {
                 if let until = recoveryUntil, time > until { recoveryUntil = nil }
             } else { recoveryUntil = nil }
             recoverySince = nil
+            quickClearSince = nil
             // A dropped landmark or brief mismatch must not count as a held
             // pose. Restart the sequence only after sustained loss, using the
             // same short grace period as the existing cover decision.
@@ -163,6 +181,11 @@ public struct OwnerPresence {
             return covered
         }
         missingSince = nil
+        if covered, let until = quickClearUntil, time <= until {
+            if quickClearSince == nil { quickClearSince = time }
+            if time - (quickClearSince ?? time) >= 0.4 { covered = false; quickClearSince = nil }
+            return covered
+        }
         if let until = recoveryUntil {
             if time > until { recoveryUntil = nil; recoverySince = nil; challenge.reset(); covered = true }
             else if covered {

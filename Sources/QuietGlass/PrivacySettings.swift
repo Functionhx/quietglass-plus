@@ -603,6 +603,22 @@ private struct PrivacySettingsView: View {
                     .disabled(model.nearby.owner.busy)
                 }
                 divider
+                row("Ask for a head turn to unlock", detail: "A small turn before clearing makes a photo harder to use. Right after you unlock your Mac, your face alone is enough.") {
+                    Toggle("Ask for a head turn to unlock", isOn: Binding(
+                        get: { model.nearby.requireMovementCheck },
+                        set: { model.nearby.setRequireMovementCheck($0) }
+                    )).labelsHidden()
+                }
+                divider
+                row("Lock Mac when I’m away", detail: "A cover is not a lock. After this long covered with nobody in view, lock macOS too.") {
+                    Picker("Lock Mac when I’m away", selection: $model.autoLockMinutes) {
+                        Text("Never").tag(0)
+                        ForEach([1, 3, 5, 10, 30], id: \.self) { Text(LF("After %d min", $0)).tag($0) }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                }
+                divider
                 row("Saved faces aren’t onlookers", detail: "When everyone in view is saved, the screen stays clear. Turn off to cover whenever a second face appears.") {
                     Toggle("Saved faces aren’t onlookers", isOn: Binding(
                         get: { model.nearby.trustSavedFaces },

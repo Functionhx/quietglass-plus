@@ -36,6 +36,10 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
             cover.includeInCaptures = demoMode
         }
     }
+    /// Lock the Mac after this many minutes covered with nobody in view (0 = never).
+    @Published var autoLockMinutes = UserDefaults.standard.integer(forKey: "autoLockMinutes") {
+        didSet { UserDefaults.standard.set(autoLockMinutes, forKey: "autoLockMinutes"); updateAutoLock() }
+    }
     /// Look of camera-triggered covers. Every style except `.glass` avoids screen capture.
     @Published var coverStyle = CoverStyle.saved {
         didSet {
@@ -100,6 +104,9 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
     private var timer: Timer?
     private var previewEnd: Task<Void, Never>?
     private var observers: [NSObjectProtocol] = []
+    private var distributedObservers: [NSObjectProtocol] = []
+    private var absentSince: Date?
+    private var autoLockTimer: Timer?
     private var keyCode: UInt32
     private var keyModifiers: UInt32
     private var privacyObservation: AnyCancellable?
@@ -254,6 +261,19 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
                 Task { @MainActor in self?.nearby.resume(after: reason); self?.resumeCamera(after: reason) }
             })
         }
+        // Screen lock and screen saver keep the display on but nobody needs the camera.
+        let systemCovers: [(String, String, NearbyPauseReason)] = [
+            ("com.apple.screenIsLocked", "com.apple.screenIsUnlocked", .screenLocked),
+            ("com.apple.screensaver.didstart", "com.apple.screensaver.didstop", .screensaver)
+        ]
+        for (pause, resume, reason) in systemCovers {
+            distributedObservers.append(DistributedNotificationCenter.default().addObserver(forName: .init(pause), object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in self?.nearby.suspend(for: reason); self?.pauseCamera(for: reason) }
+            })
+            distributedObservers.append(DistributedNotificationCenter.default().addObserver(forName: .init(resume), object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in self?.nearby.resume(after: reason); self?.resumeCamera(after: reason) }
+            })
+        }
         observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
@@ -306,8 +326,29 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         }
     }
 
+    /// A cover is not a lock: after a longer absence, lock macOS itself.
+    private func updateAutoLock() {
+        let absent = autoLockMinutes > 0 && nearby.covered && nearby.status == .watching(0)
+        guard absent else { absentSince = nil; autoLockTimer?.invalidate(); autoLockTimer = nil; return }
+        if absentSince == nil { absentSince = Date() }
+        guard autoLockTimer == nil else { return }
+        let timer = Timer(timeInterval: 10, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self, let since = self.absentSince else { return }
+                guard Date().timeIntervalSince(since) >= Double(self.autoLockMinutes) * 60 else { return }
+                self.absentSince = nil
+                self.autoLockTimer?.invalidate(); self.autoLockTimer = nil
+                ScreenLock.lockNow()
+            }
+        }
+        timer.tolerance = 5
+        autoLockTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
     /// Shows the capture-free cover for Nearby people / Recognize me and keeps its prompt current.
     func updateCover() {
+        updateAutoLock()
         let wanted = !coverStyle.usesScreenCapture && (nearby.covered || demoCovered)
         guard wanted else { cover.hide(); return }
         let title = demoCovered && !nearby.covered ? String(localized: "Protection check") : nearby.noticeTitle

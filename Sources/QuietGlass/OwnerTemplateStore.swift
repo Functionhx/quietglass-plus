@@ -184,7 +184,8 @@ final class OwnerRecognition: ObservableObject {
     }
 
     func prepareForMonitoring() async throws {
-        guard enabled else { return }
+        // Still loaded from before sleep or screen lock, which macOS authenticated.
+        guard enabled, profiles == nil else { return }
         token += 1
         let current = token
         error = nil

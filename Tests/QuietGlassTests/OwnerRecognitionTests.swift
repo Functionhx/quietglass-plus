@@ -98,17 +98,17 @@ private final class OwnerTestCamera: NearbyCameraSession {
 }
 
 final class OwnerRecognitionTests: XCTestCase {
-    @MainActor func testResumingSavedOwnerMonitoringRequiresAuthenticationAndANewChallenge() async {
+    @MainActor func testResumingAfterAnAppPauseRequiresAuthenticationAndANewChallenge() async {
         let h = OwnerRig(); defer { h.finish() }
         await h.start()
         await h.passChallenge()
         XCTAssertFalse(h.nearby.covered)
         let original = h.cameras[0]
-        h.nearby.suspend(for: .inactiveSession)
+        h.nearby.suspend(for: .protectionTest)
         XCTAssertTrue(original.stopped)
         XCTAssertNil(h.owner.profiles)
         XCTAssertTrue(h.nearby.wantsMonitoring)
-        h.nearby.resume(after: .inactiveSession)
+        h.nearby.resume(after: .protectionTest)
         await h.wait { h.cameras.count == 2 }
         XCTAssertEqual(h.authCount, 2)
         XCTAssertTrue(h.nearby.covered)
@@ -116,6 +116,48 @@ final class OwnerRecognitionTests: XCTestCase {
         for _ in 0..<20 { await h.send() }
         XCTAssertTrue(h.nearby.covered)
         await h.passChallenge()
+        XCTAssertFalse(h.nearby.covered)
+    }
+
+    @MainActor func testScreenUnlockKeepsFacesLoadedAndStartsClearForTheOwnerOnly() async {
+        let h = OwnerRig(); defer { h.finish() }
+        await h.start()
+        await h.passChallenge()
+        h.nearby.suspend(for: .screenLocked)
+        XCTAssertTrue(h.cameras[0].stopped)
+        XCTAssertNotNil(h.owner.profiles, "macOS authenticates the unlock; no second Touch ID prompt")
+        h.nearby.resume(after: .screenLocked)
+        await h.wait { h.cameras.count == 2 }
+        XCTAssertEqual(h.authCount, 1)
+        XCTAssertFalse(h.nearby.covered, "The person who just unlocked the Mac sees it at once")
+        for _ in 0..<5 { await h.send() }
+        XCTAssertFalse(h.nearby.covered)
+        for _ in 0..<5 { await h.send(matches: false) }
+        XCTAssertTrue(h.nearby.covered, "Someone else at the keyboard is still covered")
+    }
+
+    @MainActor func testWakeFromSleepClearsOnAMatchingFaceWithoutTheMovementCheck() async {
+        let h = OwnerRig(); defer { h.finish() }
+        await h.start()
+        await h.passChallenge()
+        h.nearby.suspend(for: .systemSleep)
+        h.nearby.resume(after: .systemSleep)
+        await h.wait { h.cameras.count == 2 }
+        XCTAssertEqual(h.authCount, 1)
+        XCTAssertTrue(h.nearby.covered, "Sleep may not require a password, so start covered")
+        for _ in 0..<6 { await h.send(matches: false) }
+        XCTAssertTrue(h.nearby.covered)
+        for _ in 0..<6 { await h.send() }
+        XCTAssertFalse(h.nearby.covered, "A matching face clears without turning the head")
+    }
+
+    @MainActor func testMovementCheckCanBeTurnedOff() async {
+        let h = OwnerRig(); defer { h.finish() }
+        h.nearby.setRequireMovementCheck(false)
+        await h.start()
+        await h.wait { h.owner.profiles != nil }
+        XCTAssertTrue(h.nearby.covered)
+        for _ in 0..<6 { await h.send() }
         XCTAssertFalse(h.nearby.covered)
     }
 

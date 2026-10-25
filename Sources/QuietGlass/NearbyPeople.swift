@@ -38,7 +38,15 @@ enum NearbyCameraStatus: Equatable {
 }
 
 enum NearbyPauseReason: Hashable {
-    case systemSleep, displaySleep, inactiveSession, protectionTest, ownerEnrollment
+    case systemSleep, displaySleep, inactiveSession, protectionTest, ownerEnrollment, screenLocked, screensaver
+    /// macOS normally authenticates the user when these end, so saved faces stay
+    /// loaded (no extra Touch ID prompt) and a matching face clears quickly afterwards.
+    var endsWithSystemUnlock: Bool {
+        switch self {
+        case .systemSleep, .displaySleep, .inactiveSession, .screenLocked, .screensaver: return true
+        case .protectionTest, .ownerEnrollment: return false
+        }
+    }
 }
 
 struct NearbyFaceSample {
@@ -144,6 +152,10 @@ final class NearbyPeople: ObservableObject {
     private var analysisRate = AnalysisRate.responsive
     /// Saved faces other than the one at the screen do not count as onlookers.
     @Published private(set) var trustSavedFaces: Bool
+    /// Ask for a small head turn before clearing (a modest obstacle to photos).
+    @Published private(set) var requireMovementCheck: Bool
+    private var quickClearDeadline: TimeInterval?
+    private var startVerified = false
     private var cameraObservers: [NSObjectProtocol] = []
 
     init(preferences: UserDefaults = .standard,
@@ -165,6 +177,7 @@ final class NearbyPeople: ObservableObject {
         response = NearbyResponse(rawValue: preferences.string(forKey: "nearbyResponse") ?? "") ?? .blur
         warningSoundEnabled = preferences.object(forKey: "nearbyWarningSound") as? Bool ?? true
         trustSavedFaces = preferences.object(forKey: "trustSavedFaces") as? Bool ?? true
+        requireMovementCheck = preferences.object(forKey: "requireMovementCheck") as? Bool ?? true
         warningDelay = NearbyWarningPolicy.normalizedDelay(
             preferences.object(forKey: "nearbyWarningDelay") as? Double ?? NearbyWarningPolicy.defaultDelay)
         if wantsMonitoring, let until = preferences.object(forKey: "nearbyPauseUntil") as? Date, until > wallClock() {
@@ -285,6 +298,19 @@ final class NearbyPeople: ObservableObject {
         attention = NearbyAttentionPolicy()
     }
 
+    func setRequireMovementCheck(_ value: Bool) {
+        guard requireMovementCheck != value else { return }
+        requireMovementCheck = value
+        preferences.set(value, forKey: "requireMovementCheck")
+        if value { ownerPresence.allowQuickClear(until: quickClearDeadline ?? -.infinity) } else { armQuickClear() }
+    }
+
+    /// Re-applied whenever the owner policy is recreated.
+    private func armQuickClear() {
+        if !requireMovementCheck { ownerPresence.allowQuickClear(until: .infinity) }
+        else if let deadline = quickClearDeadline { ownerPresence.allowQuickClear(until: deadline) }
+    }
+
     func setWarningSoundEnabled(_ value: Bool) {
         guard warningSoundEnabled != value else { return }
         warningSoundEnabled = value
@@ -363,12 +389,15 @@ final class NearbyPeople: ObservableObject {
 
     func suspend(for reason: NearbyPauseReason) {
         guard pauseReasons.insert(reason).inserted else { return }
-        stopSession()
+        stopSession(keepFaces: reason.endsWithSystemUnlock)
         if wantsMonitoring { status = .paused }
     }
 
     func resume(after reason: NearbyPauseReason) {
         guard pauseReasons.remove(reason) != nil else { return }
+        if reason.endsWithSystemUnlock { quickClearDeadline = clock() + 20 }
+        // Unlocking the screen or returning to this login session always authenticates.
+        if reason == .screenLocked || reason == .inactiveSession { startVerified = true }
         restore()
     }
 
@@ -388,12 +417,15 @@ final class NearbyPeople: ObservableObject {
         attention = NearbyAttentionPolicy()
         ownerRequired = owner.enabled
         ownerPresence = OwnerPresence(turnPositive: Bool.random())
+        armQuickClear()
         resetOwnerNotice()
         ownerPrompt = ownerPresence.challenge.prompt
         if ownerRequired {
             enabled = true // Remain armed/turn-off-able if authentication fails.
-            alertActive = true
+            if startVerified && owner.profiles != nil { ownerPresence.startVerified() }
+            else { alertActive = true }
         }
+        startVerified = false
         requesting = true
         status = .requesting
         // Owner mode starts protected, including while authentication is pending.
@@ -491,7 +523,7 @@ final class NearbyPeople: ObservableObject {
                                              at: sample.capturedAt, continuousFaceWithMissingLandmarks: lostLandmarks)
             if ownerMatches { lastMatchedBounds = ownerBounds }
             else if !lostLandmarks { lastMatchedBounds = nil }
-            if detected && !alertActive && !ownerPresence.recoveringLandmarks { ownerPresence.interrupt(turnPositive: Bool.random()) }
+            if detected && !alertActive && !ownerPresence.recoveringLandmarks { ownerPresence.interrupt(turnPositive: Bool.random()); armQuickClear() }
             let prompt = ownerPresence.recoveringLandmarks ? "Face the camera again" : ownerPresence.challenge.prompt
             if ownerPrompt != prompt { ownerPrompt = prompt }
             let observation: OwnerNoticeState
@@ -549,6 +581,7 @@ final class NearbyPeople: ObservableObject {
         presence.interrupt()
         if ownerRequired {
             ownerPresence.interrupt(turnPositive: Bool.random())
+            armQuickClear()
             resetOwnerNotice()
             alertActive = true
             owner.endMonitoring()
@@ -623,7 +656,7 @@ final class NearbyPeople: ObservableObject {
         stopSession()
     }
 
-    private func stopSession() {
+    private func stopSession(keepFaces: Bool = false) {
         generation += 1
         worker?.stop(); worker = nil
         watchdog?.invalidate(); watchdog = nil
@@ -636,7 +669,7 @@ final class NearbyPeople: ObservableObject {
         warmingCapture = false
         presence = NearbyPresence()
         attention = NearbyAttentionPolicy()
-        owner.endMonitoring()
+        if !keepFaces { owner.endMonitoring() }
         ownerRequired = false
         resetOwnerNotice()
         ownerPresence = OwnerPresence(turnPositive: Bool.random())

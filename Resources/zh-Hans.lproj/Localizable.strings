@@ -8,7 +8,9 @@
 "%d of 4 directions checked" = "已检查 %d/4 个方向";
 ". Check the camera and try again." = "。请检查摄像头后重试。";
 "3-second warning, then 3-second blur." = "先提醒 3 秒，再模糊 3 秒。";
+"A cover is not a lock. After this long covered with nobody in view, lock macOS too." = "遮罩不等于锁屏。遮挡且画面中无人达到这个时长后，同时锁定 macOS。";
 "A small head turn is enough. Blink naturally." = "轻轻转一下头就够了，可以正常眨眼。";
+"A small turn before clearing makes a photo harder to use. Right after you unlock your Mac, your face alone is enough." = "解除遮挡前轻轻转一下头，可以防止用照片冒充。刚解锁 Mac 后，只需认出你的脸即可。";
 "About QuietGlass" = "关于 QuietGlass";
 "About this check" = "关于此测试";
 "Activate a window first, then choose Protect active window." = "请先激活一个窗口，再选择“保护当前窗口”。";
@@ -19,6 +21,7 @@
 "Add the active app" = "添加当前 App";
 "Additional face detected" = "检测到其他面孔";
 "Adjustable blur. Records the screen continuously while monitoring, which uses more power." = "可调模糊强度。监测期间需要持续录屏，功耗较高。";
+"After %d min" = "%d 分钟后";
 "AirPods" = "AirPods";
 "AirPods connected" = "AirPods 已连接";
 "AirPods disconnected. Face the screen and recenter after reconnecting." = "AirPods 已断开，重新连接后请面向屏幕并重新居中。";
@@ -49,6 +52,7 @@
 "Apply this suggestion when it feels right for you." = "觉得合适时再应用这个建议。";
 "Approve QuietGlass in Login Items" = "请在“登录项”中允许 QuietGlass";
 "Area in %@" = "%@ 中的区域";
+"Ask for a head turn to unlock" = "恢复时要求转头确认";
 "Authenticate to set up your face" = "验证身份后录入面孔";
 "Authenticate with Touch ID or your Mac password to continue." = "请使用 Touch ID 或 Mac 密码验证以继续。";
 "Automatic" = "自动";
@@ -299,6 +303,7 @@
 "Live camera coverage" = "实时摄像头覆盖范围";
 "Live camera preview of your face" = "你的面孔实时预览";
 "Live head position" = "实时头部位置";
+"Lock Mac when I’m away" = "离开后锁定 Mac";
 "Lock your Mac when you leave it unattended" = "无人看管时请锁定你的 Mac";
 "Look around · Esc to dismiss" = "看看周围 · 按 Esc 忽略";
 "Look at the camera" = "请看向摄像头";
@@ -330,6 +335,7 @@
 "Nearby people" = "附近有人";
 "Nearby people alert" = "“附近有人”提醒";
 "Nearby people paused" = "“附近有人”已暂停";
+"Never" = "永不";
 "No active app" = "没有活跃的 App";
 "No app rules yet" = "还没有 App 规则";
 "No camera available" = "没有可用的摄像头";
