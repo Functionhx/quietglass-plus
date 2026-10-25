@@ -52,7 +52,7 @@
   --accent-ink: #b0479f;
   color-scheme: light;
 }
-body, .nav, .stat, .power-table, .readout div, .style-card, .honest, .code, .try-panel, .chip { transition: background-color .5s ease, color .5s ease, border-color .5s ease; }
+body, .nav, .stat, .power-table, .readout div, .style-card, .honest, .cmd, .try-panel, .chip { transition: background-color .5s ease, color .5s ease, border-color .5s ease; }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body {
@@ -183,16 +183,16 @@ button { font: inherit; color: inherit; }
 .win .bar i { width: .8em; height: .8em; border-radius: 50%; background: #ff5f57; }
 .win .bar i:nth-child(2) { background: #febc2e; } .win .bar i:nth-child(3) { background: #28c840; }
 .win .bar span { margin-left: .8em; }
-.chat { left: 4%; top: 9%; width: 38%; height: 62%; }
-.chat .msgs { padding: 1em; display: flex; flex-direction: column; gap: .7em; font-size: 1em; }
-.chat .m { max-width: 82%; padding: .55em .85em; border-radius: 1em; background: rgba(255,255,255,.08); }
-.chat .m.me { align-self: flex-end; background: linear-gradient(135deg, #7c5cff, #c86dd7); }
-.code { left: 45%; top: 14%; width: 51%; height: 58%; }
-.code pre { margin: 0; padding: 1em 1.2em; font-family: var(--mono); font-size: .95em; line-height: 1.6; color: #c9d1d9; white-space: pre; }
-.code .k { color: #ff7b72; } .code .s { color: #a5d6ff; } .code .f { color: #d2a8ff; } .code .cm { color: #8b949e; }
-.card { left: 8%; top: 74%; width: 34%; height: 21%; background: linear-gradient(135deg, #2b2f6b, #6d2c76); }
-.card .num { position: absolute; left: 1.2em; bottom: 1em; font-family: var(--mono); letter-spacing: .12em; font-size: 1.15em; }
-.card .chipx { position: absolute; left: 1.2em; top: 1em; width: 2.6em; height: 1.9em; border-radius: .35em; background: linear-gradient(135deg, #f5d27a, #b98d2b); }
+.win.chat { left: 4%; top: 9%; width: 38%; height: 62%; }
+.win.chat .msgs { padding: 1em; display: flex; flex-direction: column; gap: .7em; font-size: 1em; }
+.win.chat .m { max-width: 82%; padding: .55em .85em; border-radius: 1em; background: rgba(255,255,255,.08); }
+.win.chat .m.me { align-self: flex-end; background: linear-gradient(135deg, #7c5cff, #c86dd7); }
+.win.code { left: 45%; top: 14%; width: 51%; height: 58%; }
+.win.code pre { margin: 0; padding: 1em 1.2em; font-family: var(--mono); font-size: .95em; line-height: 1.6; color: #c9d1d9; white-space: pre; }
+.win.code .k { color: #ff7b72; } .win.code .s { color: #a5d6ff; } .win.code .f { color: #d2a8ff; } .win.code .cm { color: #8b949e; }
+.win.card { left: 8%; top: 74%; width: 34%; height: 21%; background: linear-gradient(135deg, #2b2f6b, #6d2c76); }
+.win.card .num { position: absolute; left: 1.2em; bottom: 1em; font-family: var(--mono); letter-spacing: .12em; font-size: 1.15em; }
+.win.card .chipx { position: absolute; left: 1.2em; top: 1em; width: 2.6em; height: 1.9em; border-radius: .35em; background: linear-gradient(135deg, #f5d27a, #b98d2b); }
 .dock {
   position: absolute; bottom: 1.5%; left: 50%; transform: translateX(-50%); display: flex; gap: .55em; padding: .5em .7em;
   border-radius: 1.1em; background: rgba(255,255,255,.12); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,.12);
@@ -368,10 +368,10 @@ button { font: inherit; color: inherit; }
 .honest { padding: 30px; border-radius: var(--radius); background: var(--glass); border: 1px solid var(--line); }
 .honest h3 { margin: 0 0 10px; font-size: 20px; }
 .honest p { margin: 0; color: var(--muted); }
-.code { position: relative; max-width: 900px; margin: 0 auto 40px; border-radius: var(--radius); background: #0b0d14; box-shadow: var(--shadow); border: 1px solid var(--line); overflow: hidden; }
-.code pre { margin: 0; padding: 30px 32px; font: 14px/1.9 var(--mono); color: #e6edf3; overflow-x: auto; }
-.code .c { color: var(--faint); }
-.copy { position: absolute; top: 14px; right: 14px; background: var(--glass); border: 1px solid var(--line); border-radius: 99px; padding: 6px 14px; font-size: 13px; cursor: pointer; }
+.cmd { position: relative; max-width: 900px; margin: 0 auto 40px; border-radius: var(--radius); background: #0b0d14; box-shadow: var(--shadow); border: 1px solid var(--line); overflow: hidden; }
+.cmd pre { margin: 0; padding: 30px 32px; font: 14px/1.9 var(--mono); color: #e6edf3; overflow-x: auto; }
+.cmd .c { color: rgba(230,237,243,.4); }
+.copy { position: absolute; top: 14px; right: 14px; color: #e6edf3; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); border-radius: 99px; padding: 6px 14px; font-size: 13px; cursor: pointer; }
 .footer { text-align: center; padding: 80px 24px 60px; color: var(--muted); border-top: 1px solid var(--line); }
 .footer a { color: var(--accent-ink); }
 
