@@ -395,6 +395,7 @@
 "Open a window first, then choose an area." = "请先打开一个窗口，再选择区域。";
 "Open the window you want to protect first." = "请先打开要保护的窗口。";
 "Open the window you want to protect, then choose an area." = "打开要保护的窗口，然后选择区域。";
+"Opens a GitHub form with your Mac, settings and recent diagnostics filled in — no images or names. Nothing is sent until you submit it." = "打开 GitHub 上的问题表单，自动填好你的 Mac 型号、设置和最近的诊断记录（不含任何图像或名字）。你确认提交之前不会发送任何内容。";
 "Owner not verified" = "未验证为本人";
 "Owner recognition unavailable" = "本人识别不可用";
 "Owner verified" = "已验证本人";
@@ -506,6 +507,8 @@
 "Remove area" = "移除区域";
 "Remove the saved face from Keychain and turn off Recognize me" = "从钥匙串移除已保存的面孔并关闭“识别我”";
 "Replay" = "重播";
+"Report a Bug…" = "报告问题…";
+"Report a bug" = "报告问题";
 "Report an Issue…" = "报告问题…";
 "Restart QuietGlass" = "重新启动 QuietGlass";
 "Restarting camera · Blur stays on" = "正在重启摄像头 · 模糊保持开启";
@@ -565,6 +568,7 @@
 "Setup cancelled. No face data was saved." = "已取消设置，未保存任何面孔数据。";
 "Shield dismissed" = "遮挡已解除";
 "Shield dismissed until you face center" = "遮挡已解除，直到你重新面向中心";
+"Show Diagnostics Log" = "显示诊断日志";
 "Show Notch" = "显示悬浮控制条";
 "Show blur in recordings" = "在录制中显示模糊";
 "Show more controls" = "显示更多控制";

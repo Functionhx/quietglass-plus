@@ -452,6 +452,22 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         if peekCovered != blur { peekCovered = blur; updateCover() }
     }
 
+    /// Opens GitHub's bug form with the environment, settings (no names or images) and
+    /// the recent diagnostics filled in, for you to review before submitting.
+    func reportBug() {
+        Diagnostics.log("bug report opened")
+        let mode = protectionMode == .away ? "away" : "recognize"
+        var settings = ["Protection: \(mode), \(cameraProtectionOn ? "on" : "off"); cover style \(coverStyle.rawValue); auto-lock \(autoLockMinutes) min"]
+        if protectionMode == .away {
+            settings.append("Away: cover after \(Int(away.delay)) s; any key for \(Int(away.graceSeconds)) s; Touch ID \(away.unlockRequiresAuthentication ? "on" : "off"); peek \(away.peekResponse.rawValue); posture \(away.postureReminders ? "on" : "off")")
+            if let note = away.lastCoverNote { settings.append("Last cover: \(note)") }
+        } else {
+            settings.append("Recognize: saved faces \(nearby.owner.faces.count); detection \(nearby.detection.rawValue); response \(nearby.response.rawValue); head turn \(nearby.requireMovementCheck ? "on" : "off")")
+        }
+        settings.append("Head tracking: \(trackingSource.rawValue), \(enabled ? "on" : "off")")
+        Diagnostics.reportBug(settings: settings)
+    }
+
     /// Master switch for camera protection in the current mode.
     var cameraProtectionOn: Bool { protectionMode == .away ? away.wantsMonitoring : nearby.wantsMonitoring }
 

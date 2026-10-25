@@ -12,6 +12,8 @@ T = {
     "离开或出现其他人时遮挡，认出已保存的面孔后自动解除。",
 "Cover after I leave for": "离开多久后遮挡", "Looking down or away briefly does not count.": "短暂低头或转开视线不算离开。",
 "%d seconds": "%d 秒",
+"Report a Bug…": "报告问题…", "Show Diagnostics Log": "显示诊断日志", "Report a bug": "报告问题",
+"Opens a GitHub form with your Mac, settings and recent diagnostics filled in — no images or names. Nothing is sent until you submit it.": "打开 GitHub 上的问题表单，自动填好你的 Mac 型号、设置和最近的诊断记录（不含任何图像或名字）。你确认提交之前不会发送任何内容。",
 "Posture: you're very close to the screen": "坐姿提醒：离屏幕太近了", "Posture: sit up a little": "坐姿提醒：坐直一点", "Posture: your head is tilted": "坐姿提醒：头歪了",
 "Posture reminders": "坐姿提醒",
 "Uses the same camera frames, no extra power. Reminds you after a while of leaning in, slumping or tilting your head; never covers the screen.": "复用同一路摄像头画面，不额外耗电。前倾、驼背或歪头持续一段时间后提醒你，不会遮挡屏幕。",

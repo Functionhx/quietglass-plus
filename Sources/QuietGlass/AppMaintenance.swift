@@ -82,7 +82,7 @@ final class AppUpdates: ObservableObject {
         checking = true; downloadPage = nil; message = "Checking for updates…"
         preferences.set(Date(), forKey: "lastUpdateCheck")
         defer { checking = false }
-        var request = URLRequest(url: URL(string: "https://api.github.com/repos/clintonimaroo/quietglass/releases/latest")!)
+        var request = URLRequest(url: URL(string: "https://api.github.com/repos/Functionhx/quietglass-plus/releases/latest")!)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("QuietGlass", forHTTPHeaderField: "User-Agent")
         do {
@@ -94,7 +94,7 @@ final class AppUpdates: ObservableObject {
                   let latest = ReleaseVersion(release.tag_name), let current = ReleaseVersion(currentVersion),
                   let url = URL(string: release.html_url), url.scheme == "https", url.host == "github.com",
                   url.user == nil, url.password == nil, url.port == nil,
-                  url.path.hasPrefix("/clintonimaroo/quietglass/releases/tag/") else {
+                  url.path.hasPrefix("/Functionhx/quietglass-plus/releases/tag/") else {
                 message = "The release information could not be verified."; return
             }
             preferences.set(Date(), forKey: "lastUpdateCheck")

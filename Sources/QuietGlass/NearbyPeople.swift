@@ -60,6 +60,9 @@ struct NearbyFaceSample {
     /// "Is someone there", when presence detection is on: faces at a lower confidence.
     /// (Vision's upper-body detector found nobody at laptop distance in testing.)
     var people: Int? = nil
+    /// Fraction of a 40×30 brightness grid that changed since the previous analyzed
+    /// frame (presence mode). A person whose face isn't detected still moves.
+    var motion: Double? = nil
 }
 
 struct CameraIdentity {
@@ -700,6 +703,7 @@ final class FaceCamera: NSObject, NearbyCameraSession, AVCaptureVideoDataOutputS
     private var analysisFailures = 0
     private var recognition = false
     private var presence = false
+    private var previousGrid: [UInt8]?
     private var recognizer: OwnerFaceModel?
     private var deviceID: String?
 
@@ -770,6 +774,23 @@ final class FaceCamera: NSObject, NearbyCameraSession, AVCaptureVideoDataOutputS
         }
     }
 
+    /// Samples 1,200 points of the luma plane (no conversion, ~microseconds) and returns
+    /// the share whose brightness moved by more than 12 levels since the last call.
+    private func motion(in buffer: CVPixelBuffer) -> Double? {
+        guard CVPixelBufferGetPlaneCount(buffer) >= 1 else { return nil }
+        CVPixelBufferLockBaseAddress(buffer, .readOnly); defer { CVPixelBufferUnlockBaseAddress(buffer, .readOnly) }
+        guard let base = CVPixelBufferGetBaseAddressOfPlane(buffer, 0)?.assumingMemoryBound(to: UInt8.self) else { return nil }
+        let width = CVPixelBufferGetWidthOfPlane(buffer, 0), height = CVPixelBufferGetHeightOfPlane(buffer, 0)
+        let stride = CVPixelBufferGetBytesPerRowOfPlane(buffer, 0)
+        var grid = [UInt8](repeating: 0, count: 1200)
+        for y in 0..<30 { for x in 0..<40 { grid[y * 40 + x] = base[(y * height / 30 + height / 60) * stride + x * width / 40 + width / 80] } }
+        defer { previousGrid = grid }
+        guard let previous = previousGrid else { return nil }
+        var changed = 0
+        for i in 0..<1200 where abs(Int(grid[i]) - Int(previous[i])) > 12 { changed += 1 }
+        return Double(changed) / 1200
+    }
+
     /// Runs the sensor at the slowest supported rate that still delivers the requested
     /// analyses. Upstream asked for 10 fps, which the built-in camera (15-30 fps) rejects,
     /// so it captured at 30 fps.
@@ -831,6 +852,7 @@ final class FaceCamera: NSObject, NearbyCameraSession, AVCaptureVideoDataOutputS
                 }
                 var sample = NearbyFaceSample(count: faces.count, capturedAt: now, bounds: faces.map(\.boundingBox))
                 sample.people = people
+                if presence { sample.motion = motion(in: buffer) }
                 sample.faces = faces.map { CameraFace(bounds: $0.boundingBox, yaw: $0.yaw?.doubleValue, pitch: $0.pitch?.doubleValue, roll: $0.roll?.doubleValue) }
                 if recognition {
                     guard let recognizer else { throw OwnerModelError.unavailable }

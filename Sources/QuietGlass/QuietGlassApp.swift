@@ -127,7 +127,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let helpItem = NSMenuItem(title: L("Help"), action: nil, keyEquivalent: "")
         let helpMenu = NSMenu(title: L("Help"))
         item("QuietGlass Help", #selector(showHelp), in: helpMenu)
-        item("Report an Issue…", #selector(reportIssue), in: helpMenu)
+        item("Report a Bug…", #selector(reportIssue), in: helpMenu)
+        item("Show Diagnostics Log", #selector(showDiagnostics), in: helpMenu)
         helpItem.submenu = helpMenu
         mainMenu.addItem(helpItem)
         NSApp.helpMenu = helpMenu
@@ -227,6 +228,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(.separator())
         item("About QuietGlass", #selector(showAbout), in: menu)
         item("QuietGlass Help", #selector(showHelp), in: menu)
+        item("Report a Bug…", #selector(reportIssue), in: menu)
         item("Downloads & Updates…", #selector(showDownloads), in: menu)
         menu.addItem(.separator())
         item("Quit QuietGlass", #selector(quit), in: menu, key: "q")
@@ -284,9 +286,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
     @objc private func showDownloads() { openProjectPage("releases/latest") }
     @objc private func checkForUpdates() { privacySettings.showUpdates(); Task { await model.updates.check() } }
-    @objc private func reportIssue() { openProjectPage("issues") }
+    @objc private func reportIssue() { model.reportBug() }
+    @objc private func showDiagnostics() { Diagnostics.reveal() }
     private func openProjectPage(_ path: String) {
-        guard let url = URL(string: "https://github.com/clintonimaroo/quietglass/\(path)") else { return }
+        guard let url = URL(string: "https://github.com/Functionhx/quietglass-plus/\(path)") else { return }
         NSWorkspace.shared.open(url)
     }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

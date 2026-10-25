@@ -11,8 +11,8 @@ final class AppUpdatesTests: XCTestCase {
 
     @MainActor func testUpdateAvailabilityAndDownloadOriginValidation() async throws {
         for (tag, link, expected) in [
-            ("v0.1.2", "https://github.com/clintonimaroo/quietglass/releases/tag/v0.1.2", true),
-            ("v0.1.0", "https://github.com/clintonimaroo/quietglass/releases/tag/v0.1.0", false),
+            ("v0.1.2", "https://github.com/Functionhx/quietglass-plus/releases/tag/v0.1.2", true),
+            ("v0.1.0", "https://github.com/Functionhx/quietglass-plus/releases/tag/v0.1.0", false),
             ("v0.1.2", "https://example.com/download", false),
             ("v0.1.2", "https://github.com/someone/other/releases/tag/v0.1.2", false)
         ] {

@@ -493,6 +493,13 @@ private struct PrivacySettingsView: View {
 
     private var maintenanceSettings: some View {
         section("Everyday use") {
+            row("Report a bug", detail: "Opens a GitHub form with your Mac, settings and recent diagnostics filled in — no images or names. Nothing is sent until you submit it.") {
+                HStack(spacing: 8) {
+                    Button("Show Diagnostics Log") { Diagnostics.reveal() }
+                    Button("Report a Bug…") { model.reportBug() }
+                }
+            }
+            divider
             row("Language", detail: "QuietGlass relaunches to switch languages.") {
                 Picker("Language", selection: Binding(get: { AppLanguage.current }, set: { model.setLanguage($0) })) {
                     ForEach(AppLanguage.allCases) { Text(verbatim: $0.title).tag($0) }

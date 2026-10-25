@@ -95,7 +95,7 @@ final class AwayMonitor: ObservableObject {
     private var stallTimer: Timer?
     /// Recent (time, faces, people) samples, logged when the screen covers so a false
     /// trigger can be diagnosed from Console: subsystem local.clinton.QuietGlass, category Away.
-    private var recent: [(TimeInterval, Int, Int)] = []
+    private var recent: [(TimeInterval, Int, Int, Double)] = []
     private let logger = Logger(subsystem: "local.clinton.QuietGlass", category: "Away")
     /// Seconds before covering when someone was last seen; shown in Settings.
     @Published private(set) var lastCoverNote: String?
@@ -143,6 +143,7 @@ final class AwayMonitor: ObservableObject {
     /// Clears the cover (after the caller's authentication) and watches again.
     func unlock() {
         guard covered else { return }
+        Diagnostics.log(String(format: "unlocked after %.0f s", Date().timeIntervalSince(coveredAt ?? Date())))
         setCovered(false)
         begin()
     }
@@ -206,9 +207,9 @@ final class AwayMonitor: ObservableObject {
     private func received(_ sample: NearbyFaceSample) {
         if failure != nil { failure = nil }
         let people = sample.people ?? sample.count
-        recent.append((sample.capturedAt, sample.count, people))
-        if recent.count > 40 { recent.removeFirst(recent.count - 40) }
-        if policy.observe(faceCount: people, at: sample.capturedAt) { becameAway(stalled: false); return }
+        recent.append((sample.capturedAt, sample.count, people, sample.motion ?? -1))
+        if recent.count > 60 { recent.removeFirst(recent.count - 60) }
+        if policy.observe(faceCount: people, motion: sample.motion, at: sample.capturedAt) { becameAway(stalled: false); return }
         observeOnlookers(sample)
         observePosture(sample)
     }
@@ -231,6 +232,7 @@ final class AwayMonitor: ObservableObject {
         let hadBaseline = posture.baseline != nil
         if let issue = posture.observe(face, at: sample.capturedAt) {
             logger.notice("Posture reminder: \(issue.rawValue, privacy: .public)")
+            Diagnostics.log("posture reminder: \(issue.rawValue)")
             onPosture?(issue)
         }
         if !hadBaseline, let learned = posture.baseline {
@@ -264,16 +266,18 @@ final class AwayMonitor: ObservableObject {
     private func setOnlooker(_ value: Bool) {
         guard onlooker != value else { return }
         onlooker = value
-        if value { logger.notice("Onlooker detected") }
+        if value { logger.notice("Onlooker detected"); Diagnostics.log("onlooker detected") }
         onOnlooker?(value)
     }
 
     private func becameAway(stalled: Bool = true) {
         let now = clock()
         let lastSeen = recent.last(where: { $0.2 > 0 }).map { now - $0.0 }
-        let window = recent.filter { now - $0.0 <= delay + 1 }
-        let summary = window.map { "\($0.1)/\($0.2)" }.joined(separator: " ")
-        logger.notice("Away cover: \(stalled ? "camera stalled" : "nobody seen", privacy: .public); last person \(lastSeen.map { String(format: "%.1f s", $0) } ?? "never", privacy: .public) ago; faces/people: \(summary, privacy: .public)")
+        let window = recent.filter { now - $0.0 <= max(delay, 6) + 1 }
+        let summary = window.map { $0.3 < 0 ? "\($0.1)/\($0.2)" : String(format: "%d/%d/%.0f%%", $0.1, $0.2, $0.3 * 100) }.joined(separator: " ")
+        let line = "away cover: \(stalled ? "camera stalled" : "nobody seen"); last person \(lastSeen.map { String(format: "%.1f s", $0) } ?? "never") ago; delay \(Int(delay)) s; faces/loose/motion: \(summary)"
+        logger.notice("\(line, privacy: .public)")
+        Diagnostics.log(line)
         lastCoverNote = stalled ? L("Last cover: the camera stopped sending frames")
             : LF("Last cover: nobody seen for %d s", Int((lastSeen ?? delay).rounded()))
         recent.removeAll()

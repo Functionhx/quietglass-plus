@@ -1,0 +1,27 @@
+name: Bug report / 报告问题
+description: Something went wrong — e.g. the screen covered while you were there. 屏幕误遮挡、该遮没遮、崩溃等。
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened? / 发生了什么？
+      description: What were you doing just before? (e.g. leaning on one arm, reading a phone, dim light) 当时你在做什么？比如托着脸、看手机、光线较暗。
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect? / 你期望的是？
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment / 环境
+      description: Filled in by “Report a Bug…” in the app. 由 App 里的“报告问题…”自动填写。
+      render: text
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Recent diagnostics / 最近的诊断记录
+      description: From ~/Library/Logs/QuietGlass/diagnostics.log — numbers and decisions only, no images. 只有数字和判定，没有图像。
+      render: text

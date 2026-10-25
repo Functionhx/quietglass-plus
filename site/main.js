@@ -51,6 +51,7 @@ const EN = {
   "install.after": "Then: Settings → Protection → turn on camera protection. The default is “cover when I leave, unlock by keyboard”.",
   "install.github": "View on GitHub",
   "footer.credit": "Built on <a href=\"https://github.com/clintonimaroo/quietglass\">QuietGlass</a> by Clinton Imaro · SFace model Apache 2.0 · MIT License",
+  "footer.bug": "Found a bug? Tell us →",
   "footer.power": "This page saves power too: off-screen animations pause, and Reduce Motion is respected.",
   // dynamic
   "cap.fold": "Fold", "cap.curtain": "Curtain", "cap.frosted": "Frosted", "cap.black": "Black",
