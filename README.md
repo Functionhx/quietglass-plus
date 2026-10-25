@@ -1,3 +1,50 @@
+# QuietGlass Plus
+
+A fork of [QuietGlass](https://github.com/clintonimaroo/quietglass) by Clinton Imaro (MIT) focused on **all-day, low-power owner protection**: the screen stays clear only while a saved face is at the Mac, and covers itself when you leave, a stranger sits down, or someone looks over your shoulder.
+
+基于 [QuietGlass](https://github.com/clintonimaroo/quietglass) 的分支版本：**只有认出你（或你保存的人）时屏幕才清晰**，离开、陌生人坐下或有人在身后看时自动遮挡，并针对全天常驻做了功耗优化。
+
+## What's different / 改动
+
+| | QuietGlass 0.1.2 | QuietGlass Plus |
+|---|---|---|
+| Camera sensor rate | 30 fps (the 10 fps request is rejected by 15–30 fps cameras) | slowest supported rate (15 fps), native 420v frames |
+| Face analysis | ~11/s, every face, CPU | 3/s when settled, 10/s while verifying |
+| SFace embedding | CPU, 4.5 ms | Neural Engine, 0.85 ms (embeddings verified against CPU, cosine > 0.999) |
+| Cover while monitoring | full-resolution screen recording at 30 fps, kept warm | no screen capture; WindowServer-composited cover |
+| Cover styles | captured blur | **fold** (folding-phone animation), frosted, curtain, black, captured blur |
+| Saved faces | one | up to 5 named faces (partner, "me with glasses"…); saved people aren't onlookers |
+| Escape while covered | anyone can clear protection | needs Touch ID / password when Recognize me is on |
+| Screen lock / screen saver | camera keeps running | camera stops; after unlock your face clears at once, no second Touch ID |
+| Away for a long time | — | optional: lock the Mac after N minutes |
+| Head tracking | AirPods, camera | + **Sony WF-1000XM6 and other earbuds** speaking Android's head tracker HID protocol |
+| Language | English | English, 简体中文 (follows macOS or set in General) |
+
+Measured on a MacBook Air (M4): `cameracaptured` drops from ~21% to ~10% CPU by halving the sensor rate; the app idles at ~1% CPU with Settings open.
+
+### Sony and other earbuds / Sony 等耳机
+
+Earbuds such as the Sony WF-1000XM6 expose Android's head tracker over Bluetooth HID (Sensor page `0x20`, usage `0xE1`, `#AndroidHeadTracker#1.0`). QuietGlass Plus reads it with IOHIDManager — no extra permission — and only powers the earbud sensor while tracking. Notes from testing: each new audio stream resets the reference frame (stitched), the orientation drifts for ~12 s after power-up (held back), and earbuds sit tilted in the ear, so covering uses the total rotation from center. Check yours with `QuietGlass.app/Contents/MacOS/QuietGlass --headphone-check` (voice-guided).
+
+## Build and install / 构建与安装
+
+```sh
+scripts/setup-isolated-signing.sh          # once: stable local signing, keeps Camera approval across builds
+bash build.sh "$PWD/dist/QuietGlass.app"
+ditto dist/QuietGlass.app /Applications/QuietGlass.app
+```
+
+First use: Settings → Protection → Nearby people → **Set up my face**, then turn on **Detect additional faces** (the master switch for camera protection).
+首次使用：设置 → 保护 → 附近有人 → **录入我的面孔**，然后打开 **摄像头自动保护（总开关）**。
+
+Development aids: `--preview-cover fold|frosted|curtain|black`, `--headphone-check`, `scripts/measure-power.sh`, `scripts/bench-pipeline.swift`, `scripts/gen-localization.py --missing`.
+
+Limitations are the same as upstream: an RGB camera cannot prove liveness (the head-turn check only raises the bar for photos), and a cover is not a lock — use the auto-lock option for longer absences.
+
+---
+
+*Original README follows.*
+
 # QuietGlass
 
 **Privacy for what’s on your Mac.**
