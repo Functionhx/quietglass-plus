@@ -8,8 +8,9 @@ let package = Package(
     products: [.executable(name: "QuietGlass", targets: ["QuietGlass"])],
     targets: [
         .target(name: "ShieldCore"),
-        .executableTarget(name: "QuietGlass", dependencies: ["ShieldCore"], resources: [
-            .copy("Resources/SFace.mlmodel"),
+        // SFace.mlmodel is compiled into the app by build.sh. Xcode 27's SwiftPM
+        // tries to generate model classes for bundled .mlmodel resources and fails.
+        .executableTarget(name: "QuietGlass", dependencies: ["ShieldCore"], exclude: ["Resources/SFace.mlmodel"], resources: [
             .copy("Resources/NearbyAlert.mp3")
         ]),
         .testTarget(name: "ShieldCoreTests", dependencies: ["ShieldCore"]),

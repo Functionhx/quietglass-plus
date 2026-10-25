@@ -9,6 +9,24 @@ struct QuietGlassApp {
     @MainActor static func main() {
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)
+        if let index = CommandLine.arguments.firstIndex(of: "--preview-cover") {
+            // Development aid: cover, hold, reveal and quit, without camera or settings.
+            let style = CoverStyle(rawValue: CommandLine.arguments.dropFirst(index + 1).first ?? "") ?? .fold
+            let cover = PrivacyCover()
+            cover.includeInCaptures = true
+            if let screen = NSScreen.main {
+                let size = NSSize(width: 960, height: 600)
+                cover.previewFrame = NSRect(x: screen.frame.maxX - size.width - 20, y: screen.frame.minY + 20, width: size.width, height: size.height)
+            }
+            cover.badge.title = String(localized: "No face in view")
+            cover.badge.detail = String(localized: "Look at the camera to unlock")
+            cover.badge.canUnlock = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { cover.show(style: style) }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4.5) { cover.hide() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 6) { exit(0) }
+            withExtendedLifetime(cover) { app.run() }
+            return
+        }
         let delegate = AppDelegate()
         app.delegate = delegate
         withExtendedLifetime(delegate) { app.run() }

@@ -68,12 +68,24 @@ protocol NearbyCameraSession: AnyObject {
     func stop()
     func configureRecognition(_ enabled: Bool)
     func configureDevice(_ id: String?)
+    /// Requested face analyses per second. Shared cameras run at the fastest client's rate.
+    func configureRate(_ analysesPerSecond: Double)
 }
 
 extension NearbyCameraSession {
     var previewSession: AVCaptureSession? { nil }
     func configureRecognition(_ enabled: Bool) {}
     func configureDevice(_ id: String?) {}
+    func configureRate(_ analysesPerSecond: Double) {}
+}
+
+/// Analysis cadence. Camera cost is dominated by the sensor frame rate (cameracaptured
+/// uses ~21% CPU at 30 fps vs ~10% at 15 fps on an M4 MacBook Air), so the sensor runs
+/// at its slowest supported rate and frames are skipped before any Vision work.
+enum AnalysisRate {
+    static let steady = 3.0       // one face, nothing changing
+    static let responsive = 10.0  // covered with a face in view, extra faces, verification
+    static let headTracking = 5.0 // CameraTracking resets after 0.4 s gaps
 }
 
 @MainActor
@@ -129,6 +141,7 @@ final class NearbyPeople: ObservableObject {
     private var ownerNoticeCandidate: OwnerNoticeState?
     private var ownerNoticeCandidateSince: TimeInterval = 0
     private var pauseReasons: Set<NearbyPauseReason> = []
+    private var analysisRate = AnalysisRate.responsive
     private var cameraObservers: [NSObjectProtocol] = []
 
     init(preferences: UserDefaults = .standard,
@@ -404,8 +417,10 @@ final class NearbyPeople: ObservableObject {
                 }
             }
             self.worker = worker
+            self.analysisRate = AnalysisRate.responsive
             worker.configureDevice(self.selectedCameraID)
             worker.configureRecognition(self.ownerRequired)
+            worker.configureRate(self.analysisRate)
             worker.start()
             if self.usesWatchdog {
                 let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
@@ -472,6 +487,18 @@ final class NearbyPeople: ObservableObject {
         let next = NearbyCameraStatus.watching(sample.count)
         if status != next { status = next }
         updateProtection()
+        updateAnalysisRate(faceCount: sample.count)
+    }
+
+    /// Steady 3/s while one face is settled (clear) or nobody is in view (covered);
+    /// 10/s while verifying a returning face or tracking additional faces, so
+    /// prompts and the movement check stay responsive. All policies are time-based.
+    private func updateAnalysisRate(faceCount: Int) {
+        let settling = faceCount > 1 || (alertActive && faceCount > 0) || (ownerRequired && ownerNoticeCandidate != nil)
+        let rate = settling ? AnalysisRate.responsive : AnalysisRate.steady
+        guard rate != analysisRate else { return }
+        analysisRate = rate
+        worker?.configureRate(rate)
     }
 
     private func resetOwnerNotice() {
@@ -606,6 +633,8 @@ final class FaceCamera: NSObject, NearbyCameraSession, AVCaptureVideoDataOutputS
     var previewSession: AVCaptureSession? { session }
     private let completion: (Result<NearbyFaceSample, NearbyCameraFailure>) -> Void
     private var lastScan: TimeInterval = 0
+    private var interval: TimeInterval = 1 / AnalysisRate.responsive
+    private weak var device: AVCaptureDevice?
     private var stopped = false
     private var observers: [NSObjectProtocol] = []
     private var analysisFailures = 0
@@ -628,6 +657,13 @@ final class FaceCamera: NSObject, NearbyCameraSession, AVCaptureVideoDataOutputS
         }
     }
     func configureDevice(_ id: String?) { queue.async { [self] in deviceID = id } }
+    func configureRate(_ analysesPerSecond: Double) {
+        queue.async { [self] in
+            guard analysesPerSecond > 0 else { return }
+            interval = 1 / analysesPerSecond
+            if let device { limitFrameRate(device) }
+        }
+    }
 
     func start() {
         queue.async { [self] in
@@ -641,7 +677,9 @@ final class FaceCamera: NSObject, NearbyCameraSession, AVCaptureVideoDataOutputS
                 let input = try AVCaptureDeviceInput(device: device)
                 let output = AVCaptureVideoDataOutput()
                 output.alwaysDiscardsLateVideoFrames = true
-                output.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+                // The sensor's native biplanar format: Vision and Core Image read it
+                // directly, avoiding a BGRA conversion of every captured frame.
+                output.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange]
                 output.setSampleBufferDelegate(self, queue: queue)
                 session.beginConfiguration()
                 if session.canSetSessionPreset(.vga640x480) { session.sessionPreset = .vga640x480 }
@@ -658,26 +696,31 @@ final class FaceCamera: NSObject, NearbyCameraSession, AVCaptureVideoDataOutputS
                     connection.automaticallyAdjustsVideoMirroring = false
                     connection.isVideoMirrored = false
                 }
-                limitFrameRate(device)
+                self.device = device
                 observe(AVCaptureSession.runtimeErrorNotification, object: session, failure: .configuration)
                 observe(AVCaptureSession.wasInterruptedNotification, object: session, failure: .interrupted)
                 observe(AVCaptureDevice.wasDisconnectedNotification, object: device, failure: .disconnected)
                 session.startRunning()
                 if !session.isRunning { completion(.failure(.configuration)) }
+                // The session preset resets frame durations on start; limit afterwards.
+                limitFrameRate(device)
             } catch { completion(.failure(error as? NearbyCameraFailure ?? .configuration)) }
         }
     }
 
+    /// Runs the sensor at the slowest supported rate that still delivers the requested
+    /// analyses. Upstream asked for 10 fps, which the built-in camera (15-30 fps) rejects,
+    /// so it captured at 30 fps.
     private func limitFrameRate(_ device: AVCaptureDevice) {
-        let fps: Double = 10
-        guard let range = device.activeFormat.videoSupportedFrameRateRanges.first(where: { $0.minFrameRate <= fps && $0.maxFrameRate >= fps }),
+        guard let range = device.activeFormat.videoSupportedFrameRateRanges.max(by: { $0.maxFrameRate < $1.maxFrameRate }) else { return }
+        let fps = min(range.maxFrameRate, max(range.minFrameRate, ceil(1 / interval)))
+        let duration = CMTime(value: 1000, timescale: CMTimeScale(fps * 1000))
+        guard CMTimeCompare(device.activeVideoMinFrameDuration, duration) != 0 || CMTimeCompare(device.activeVideoMaxFrameDuration, duration) != 0,
               (try? device.lockForConfiguration()) != nil else { return }
         defer { device.unlockForConfiguration() }
         if #available(macOS 15.0, *), device.isAutoVideoFrameRateEnabled { return }
-        let duration = CMTime(value: 1, timescale: CMTimeScale(fps))
-        if CMTimeCompare(duration, range.maxFrameDuration) <= 0 && CMTimeCompare(duration, range.minFrameDuration) >= 0 {
-            device.activeVideoMinFrameDuration = duration
-        }
+        device.activeVideoMinFrameDuration = duration
+        device.activeVideoMaxFrameDuration = duration
     }
 
     private func observe(_ name: Notification.Name, object: AnyObject, failure: NearbyCameraFailure) {
@@ -707,7 +750,8 @@ final class FaceCamera: NSObject, NearbyCameraSession, AVCaptureVideoDataOutputS
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
         let now = ProcessInfo.processInfo.systemUptime
-        guard !stopped, now - lastScan >= 0.09, let buffer = sampleBuffer.imageBuffer else { return }
+        // Allow a few ms of jitter so a 15 fps sensor yields exactly 3 or 10 analyses/s.
+        guard !stopped, now - lastScan >= interval - 0.01, let buffer = sampleBuffer.imageBuffer else { return }
         lastScan = now
         do {
             let sample = try autoreleasepool {

@@ -54,7 +54,7 @@ final class CameraHeadTracking: ObservableObject {
                 }
             }
             self.camera = camera
-            camera.configureDevice(deviceID); camera.start()
+            camera.configureDevice(deviceID); camera.configureRate(AnalysisRate.headTracking); camera.start()
             message = "Look at the screen and hold still for a moment."
             if usesTimer {
                 let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in Task { @MainActor in self?.tick() } }

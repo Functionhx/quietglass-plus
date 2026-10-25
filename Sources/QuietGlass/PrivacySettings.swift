@@ -598,6 +598,14 @@ private struct PrivacySettingsView: View {
                     set: { model.setNearbyResponse($0) }
                 ))
             }
+            divider
+            row("Cover style", detail: model.coverStyle.detail) {
+                Picker("Cover style", selection: $model.coverStyle) {
+                    ForEach(CoverStyle.allCases) { Text($0.title).tag($0) }
+                }
+                .labelsHidden()
+                .fixedSize()
+            }
             if model.nearby.response == .warning {
                 divider
                 row("Blur after", detail: "Time to respond before automatic blur. Clearing the alert cancels the timer; Escape stops monitoring.") {

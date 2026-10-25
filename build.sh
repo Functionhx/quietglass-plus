@@ -29,8 +29,16 @@ if [[ -z "$quietglass_signing_identity" ]]; then
     if [[ -z "$quietglass_signing_identity" ]]; then
         quietglass_signing_identity="$(security find-identity -v -p codesigning | /usr/bin/awk '/"Apple Development:/ { print $2; exit }')"
     fi
+    quietglass_isolated_dir="$HOME/Library/Application Support/QuietGlassSigning"
+    if [[ -z "$quietglass_signing_identity" && -f "$quietglass_isolated_dir/signing.keychain-db" ]]; then
+        # Created by scripts/setup-isolated-signing.sh; keeps a stable identity without login-keychain trust changes.
+        security unlock-keychain -p "$(cat "$quietglass_isolated_dir/pw")" "$quietglass_isolated_dir/signing.keychain-db"
+        quietglass_signing_identity="QuietGlass Local Development (isolated)"
+        quietglass_codesign_keychain=(--keychain "$quietglass_isolated_dir/signing.keychain-db")
+    fi
     quietglass_signing_identity="${quietglass_signing_identity:--}"
 fi
+quietglass_codesign_keychain=("${quietglass_codesign_keychain[@]+"${quietglass_codesign_keychain[@]}"}")
 quietglass_stage="$(mktemp -d "${TMPDIR:-/tmp}/quietglass-build.XXXXXX")"
 trap 'rm -rf "$quietglass_stage"' EXIT
 quietglass_staged_app="$quietglass_stage/QuietGlass.app"
@@ -62,16 +70,16 @@ xcrun actool Resources/AppIcon/QuietGlass.icon \
     --output-partial-info-plist "$quietglass_stage/icon-info.plist" \
     --output-format human-readable-text --warnings --errors
 /usr/libexec/PlistBuddy -c "Merge $quietglass_stage/icon-info.plist" "$quietglass_staged_app/Contents/Info.plist"
-codesign --force --sign "$quietglass_signing_identity" --identifier local.clinton.QuietGlass "$quietglass_staged_app"
+codesign --force ${quietglass_codesign_keychain[@]+"${quietglass_codesign_keychain[@]}"} --sign "$quietglass_signing_identity" --identifier local.clinton.QuietGlass "$quietglass_staged_app"
 quietglass_team="$(codesign -dv "$quietglass_staged_app" 2>&1 | /usr/bin/awk -F= '/^TeamIdentifier=/ { print $2 }')"
 if [[ -n "$quietglass_team" && "$quietglass_team" != "not set" ]]; then
     python3 scripts/build-intents.py "$quietglass_bin_dir" "$quietglass_staged_app/Contents/Resources"
-    codesign --force --sign "$quietglass_signing_identity" --identifier local.clinton.QuietGlass "$quietglass_staged_app"
+    codesign --force ${quietglass_codesign_keychain[@]+"${quietglass_codesign_keychain[@]}"} --sign "$quietglass_signing_identity" --identifier local.clinton.QuietGlass "$quietglass_staged_app"
 else
     printf '%s\n' 'Shortcuts actions omitted: execution requires an Apple-signed developer identity with a Team ID.'
 fi
 if codesign -dv "$quietglass_staged_app" 2>&1 | /usr/bin/grep -q '^Authority=Developer ID Application:'; then
-    codesign --force --sign "$quietglass_signing_identity" --identifier local.clinton.QuietGlass \
+    codesign --force ${quietglass_codesign_keychain[@]+"${quietglass_codesign_keychain[@]}"} --sign "$quietglass_signing_identity" --identifier local.clinton.QuietGlass \
         --options runtime --timestamp --entitlements Resources/QuietGlass.entitlements "$quietglass_staged_app"
 fi
 codesign --verify --strict --all-architectures "$quietglass_staged_app"

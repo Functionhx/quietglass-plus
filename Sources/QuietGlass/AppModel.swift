@@ -33,6 +33,18 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
             UserDefaults.standard.set(demoMode, forKey: "includeBlurInCaptures")
             overlay.includeInCaptures = demoMode
             privacy.includeInCaptures = demoMode
+            cover.includeInCaptures = demoMode
+        }
+    }
+    /// Look of camera-triggered covers. Every style except `.glass` avoids screen capture.
+    @Published var coverStyle = CoverStyle.saved {
+        didSet {
+            guard coverStyle != oldValue else { return }
+            UserDefaults.standard.set(coverStyle.rawValue, forKey: CoverStyle.preferenceKey)
+            // Move an active cover between the capture-free cover and the captured blur.
+            privacy.setNearbyMonitoring(nearby.enabled && coverStyle.usesScreenCapture)
+            privacy.setNearbyCovered(nearby.covered && coverStyle.usesScreenCapture)
+            updateCover()
         }
     }
     @Published var comfort: Double { didSet { save("comfort", comfort); refreshResponse() } }
@@ -73,6 +85,8 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
 
     private let motion = CMHeadphoneMotionManager()
     private let overlay = ShieldOverlay()
+    let cover = PrivacyCover()
+    private var demoCovered = false
     private let shortcuts = GlobalShortcuts()
     private var response = ShieldResponse()
     private var center: simd_quatd?
@@ -118,12 +132,28 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         shortcutLabel = prefs.string(forKey: "shortcutLabel") ?? "⌃⌥⌘C"
         super.init()
         cameraTracking.onChange = { [weak self] in self?.receiveCameraTracking() }
-        nearby.onCoverage = { [weak self] value in self?.privacy.setNearbyCovered(value) }
-        nearby.onMonitoring = { [weak self] value in self?.privacy.setNearbyMonitoring(value) }
+        nearby.onCoverage = { [weak self] value in
+            guard let self else { return }
+            self.privacy.setNearbyCovered(value && self.coverStyle.usesScreenCapture)
+            self.updateCover()
+        }
+        // Upstream keeps a 30 fps full-resolution screen stream warm while monitoring so the
+        // captured blur appears instantly. The capture-free cover needs no warm-up.
+        nearby.onMonitoring = { [weak self] value in
+            guard let self else { return }
+            self.privacy.setNearbyMonitoring(value && self.coverStyle.usesScreenCapture)
+        }
         protectionCheck.onBegin = { [weak self] in self?.nearby.suspend(for: .protectionTest); self?.pauseCamera(for: .protectionTest) }
         protectionCheck.onEnd = { [weak self] in self?.nearby.resume(after: .protectionTest); self?.resumeCamera(after: .protectionTest) }
-        protectionCheck.onDemoCoverage = { [weak self] in self?.privacy.setTestCovered($0) }
-        protectionCheck.demoAvailable = { [weak self] in self?.privacy.captureUnavailable == false }
+        protectionCheck.onDemoCoverage = { [weak self] value in
+            guard let self else { return }
+            if self.coverStyle.usesScreenCapture { self.privacy.setTestCovered(value) }
+            else { self.demoCovered = value; self.updateCover() }
+        }
+        protectionCheck.demoAvailable = { [weak self] in
+            guard let self else { return false }
+            return !self.coverStyle.usesScreenCapture || self.privacy.captureUnavailable == false
+        }
         protectionCheckObservation = protectionCheck.objectWillChange.receive(on: RunLoop.main).sink { [weak self] _ in self?.objectWillChange.send() }
         maintenanceObservations = [
             loginPreference.objectWillChange.sink { [weak self] _ in self?.objectWillChange.send() },
@@ -131,7 +161,7 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         ]
         nearby.prepareMonitoring = { [weak self] in
             guard let self else { return .escapeUnavailable }
-            if self.nearby.response == .blur, !self.screenPermission { return .screenPermission }
+            if self.nearby.response == .blur, self.coverStyle.usesScreenCapture, !self.screenPermission { return .screenPermission }
             guard self.shortcuts.armEscape(true) else {
                 self.privacyShortcutError = "Escape is unavailable. Nearby people could not start."
                 return .escapeUnavailable
@@ -142,7 +172,10 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
             self?.objectWillChange.send()
             self?.refreshEscape()
             self?.updateShield()
+            self?.updateCover()
         }
+        cover.includeInCaptures = demoMode
+        cover.badge.onUnlock = { [weak self] in self?.unlockCoverWithAuthentication() }
         privacy.blurRadius = blur
         overlay.includeInCaptures = demoMode
         privacy.includeInCaptures = demoMode
@@ -152,7 +185,12 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         shortcuts.onRecenter = { [weak self] in self?.recenter() }
         shortcuts.onEscape = { [weak self] in
             guard let self else { return }
-            if self.headSetupActive { self.onCancelHeadSetup?() } else { self.dismissShield() }
+            if self.headSetupActive { self.onCancelHeadSetup?() }
+            else if self.cover.isCovered && self.nearby.owner.enabled {
+                // Escape used to clear everything. With Recognize me, a covered screen
+                // must not be dismissible by whoever is sitting at the keyboard.
+                self.authenticateThen("Turn off QuietGlass protection.") { $0.dismissShield() }
+            } else { self.dismissShield() }
         }
         shortcuts.onPrivacy = { [weak self] in self?.toggleInstantShield() }
         shortcuts.onArea = { [weak self] in self?.privacy.chooseArea() }
@@ -268,7 +306,40 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         }
     }
 
+    /// Shows the capture-free cover for Nearby people / Recognize me and keeps its prompt current.
+    func updateCover() {
+        let wanted = !coverStyle.usesScreenCapture && (nearby.covered || demoCovered)
+        guard wanted else { cover.hide(); return }
+        let title = demoCovered && !nearby.covered ? String(localized: "Protection check") : nearby.noticeTitle
+        let detail = nearby.owner.enabled && nearby.covered ? String(localized: "Look at the camera to unlock") : ""
+        if cover.badge.title != title { cover.badge.title = title }
+        if cover.badge.detail != detail { cover.badge.detail = detail }
+        let canUnlock = nearby.owner.enabled && nearby.covered
+        if cover.badge.canUnlock != canUnlock { cover.badge.canUnlock = canUnlock }
+        cover.show(style: coverStyle)
+    }
+
+    /// Fallback when the camera cannot recognize you (poor light, new glasses):
+    /// Touch ID or the Mac password pauses Nearby people for five minutes.
+    private func unlockCoverWithAuthentication() {
+        authenticateThen("Pause QuietGlass protection for 5 minutes.") { $0.nearby.pauseForFiveMinutes() }
+    }
+
+    private var authenticating = false
+    private func authenticateThen(_ reason: String, _ action: @escaping @MainActor (AppModel) -> Void) {
+        guard !authenticating else { return }
+        authenticating = true
+        Task { @MainActor [weak self] in
+            defer { self?.authenticating = false }
+            guard let context = try? await OwnerRecognition.authenticateUser(reason) else { return }
+            context.invalidate()
+            guard let self else { return }
+            action(self)
+        }
+    }
+
     private func refreshDisplays() {
+        cover.reconcileScreens()
         let layout = Dictionary(uniqueKeysWithValues: NSScreen.screens.compactMap { screen -> (UInt32, CGRect)? in
             guard let id = (screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value else { return nil }
             return (id, screen.frame)

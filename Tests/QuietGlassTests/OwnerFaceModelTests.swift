@@ -40,6 +40,25 @@ final class OwnerFaceModelTests: XCTestCase {
         }
     }
 
+    func testNeuralEngineEmbeddingsMatchFullPrecisionCPU() throws {
+        let cpu = try OwnerFaceModel(computeUnits: .cpuOnly)
+        let ane = try OwnerFaceModel(computeUnits: .cpuAndNeuralEngine)
+        var vectors: [String: (cpu: [Float], ane: [Float])] = [:]
+        for name in ["center", "left", "right"] {
+            let buffer = try fixtureBuffer(name)
+            let face = try XCTUnwrap(OwnerFaceDetector.observations(in: buffer).first)
+            let a = try XCTUnwrap(cpu.features(buffer: buffer, face: face)).vector
+            let b = try XCTUnwrap(ane.features(buffer: buffer, face: face)).vector
+            XCTAssertGreaterThan(OwnerTemplate.similarity(a, b), 0.999, name)
+            vectors[name] = (a, b)
+        }
+        // Cross-pose scores, which decide matches, must agree to well within the margin.
+        for (x, y) in [("center", "left"), ("center", "right"), ("left", "right")] {
+            let reference = OwnerTemplate.similarity(vectors[x]!.cpu, vectors[y]!.cpu)
+            XCTAssertEqual(OwnerTemplate.similarity(vectors[x]!.ane, vectors[y]!.ane), reference, accuracy: 0.005, "\(x)/\(y)")
+        }
+    }
+
     func testActualVisionAndModelSamplesCompleteEnrollmentWithoutClosingEyes() throws {
         let model = try OwnerFaceModel()
         func sample(_ name: String) throws -> (vector: [Float], pose: OwnerPose) {
