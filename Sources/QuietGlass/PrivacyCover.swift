@@ -34,7 +34,10 @@ final class CoverBadgeModel: ObservableObject {
     @Published var title = ""
     @Published var detail = ""
     @Published var canUnlock = false
+    /// Shown when no authentication is needed to clear (looking away, no Recognize me).
+    @Published var canExit = false
     var onUnlock: (() -> Void)?
+    var onExit: (() -> Void)?
 }
 
 private struct CoverBadge: View {
@@ -57,9 +60,9 @@ private struct CoverBadge: View {
                     .font(.system(size: 13))
                     .foregroundStyle(.white.opacity(0.6))
             }
-            if model.canUnlock {
-                Button { model.onUnlock?() } label: {
-                    Label("Unlock with Touch ID", systemImage: "touchid")
+            if model.canUnlock || model.canExit {
+                Button { model.canUnlock ? model.onUnlock?() : model.onExit?() } label: {
+                    Label(model.canUnlock ? "Unlock with Touch ID" : "Exit blur", systemImage: model.canUnlock ? "touchid" : "xmark.circle")
                         .font(.system(size: 13, weight: .medium))
                         .padding(.horizontal, 14).padding(.vertical, 7)
                 }

@@ -201,6 +201,7 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         }
         cover.includeInCaptures = demoMode
         cover.badge.onUnlock = { [weak self] in self?.unlockCoverWithAuthentication() }
+        cover.badge.onExit = { [weak self] in self?.dismissShield() }
         privacy.blurRadius = blur
         overlay.includeInCaptures = demoMode
         privacy.includeInCaptures = demoMode
@@ -375,6 +376,7 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         if cover.badge.detail != detail { cover.badge.detail = detail }
         let canUnlock = nearby.owner.enabled && nearby.covered
         if cover.badge.canUnlock != canUnlock { cover.badge.canUnlock = canUnlock }
+        if cover.badge.canExit != !canUnlock { cover.badge.canExit = !canUnlock }
         cover.show(style: coverStyle)
     }
 

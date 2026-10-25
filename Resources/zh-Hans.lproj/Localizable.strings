@@ -221,6 +221,7 @@
 "Escape is unavailable. Protection is paused." = "Esc 不可用，保护已暂停。";
 "Escape shortcut is unavailable" = "Esc 快捷键不可用";
 "Everyday use" = "日常使用";
+"Exit blur" = "退出模糊";
 "Expand sidebar" = "展开边栏";
 "Expanded" = "已展开";
 "Face detection unavailable" = "人脸检测不可用";
@@ -272,7 +273,7 @@
 "Headphone sensor is settling…" = "耳机传感器校准中…";
 "Headphones disconnected. Face the screen and recenter after reconnecting." = "耳机已断开，重新连接后请面向屏幕并重新居中。";
 "Help" = "帮助";
-"Hide Notch" = "隐藏刘海栏";
+"Hide Notch" = "隐藏悬浮控制条";
 "Hide for 1 hour" = "隐藏 1 小时";
 "Hide more controls" = "隐藏更多控制";
 "Highest blur strength" = "最高模糊强度";
@@ -333,7 +334,7 @@
 "Motion unavailable. Connect your AirPods and try again." = "无法获取运动数据，请连接 AirPods 后重试。";
 "Motion was interrupted. Reconnect your AirPods and try again." = "运动数据中断，请重新连接 AirPods 后重试。";
 "Motion was interrupted. Reconnect your AirPods to continue." = "运动数据中断，请重新连接 AirPods 以继续。";
-"Move Notch Down" = "将刘海栏移到下方";
+"Move Notch Down" = "将悬浮控制条移到下方";
 "Movement looks good" = "动作正常";
 "Name" = "名字";
 "Name, e.g. Me, Alex, With glasses" = "名字，例如：我、小王、戴眼镜";
@@ -530,7 +531,7 @@
 "Setup cancelled. No face data was saved." = "已取消设置，未保存任何面孔数据。";
 "Shield dismissed" = "遮挡已解除";
 "Shield dismissed until you face center" = "遮挡已解除，直到你重新面向中心";
-"Show Notch" = "显示刘海栏";
+"Show Notch" = "显示悬浮控制条";
 "Show blur in recordings" = "在录制中显示模糊";
 "Show more controls" = "显示更多控制";
 "Sit comfortably and look straight ahead. We’ll use this as your center position." = "舒适地坐好并直视前方，我们会把这里作为中心位置。";

@@ -187,7 +187,7 @@ final class NotchBarController: NSObject, NSWindowDelegate, NSPopoverDelegate {
         if panel.isVisible { hide() } else { show() }
     }
 
-    private func hide() {
+    func hide() {
         closeControls()
         collapseTask?.cancel()
         showHint(nil)

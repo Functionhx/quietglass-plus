@@ -50,6 +50,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var profilePicker: ProfilePickerController!
     private var keyMonitor: Any?
     private var observation: AnyCancellable?
+    private var floatingObservation: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         model = AppModel()
@@ -132,6 +133,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         observation = model.$coverage.combineLatest(model.privacy.$instant).sink { [weak self] value, instant in
             self?.statusItem.button?.image = (value > 0 || instant ? AppIcon.viewOff : .view).image()
         }
+        floatingObservation = model.objectWillChange.receive(on: RunLoop.main).sink { [weak self] _ in
+            self?.updateFloatingControls()
+        }
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self else { return event }
             if self.model.recordingShortcut {
@@ -149,11 +153,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             if event.keyCode == 53 { self.notch.closeControls() }
             return event
         }
-        notch.show()
-        privacySettings.show()
+        // The floating control bar is opt-in (menu bar → Show Floating Controls);
+        // everything on it is also in the menu bar menu.
+        if Self.showsFloatingControls { notch.show() }
+        // Settings opens on its own only until camera protection is set up, so a
+        // login launch stays out of the way.
+        if !model.nearby.wantsMonitoring { privacySettings.show() }
         if UserDefaults.standard.bool(forKey: "showControlsAfterRelaunch") {
             UserDefaults.standard.removeObject(forKey: "showControlsAfterRelaunch")
-            notch.showControls()
+            if Self.showsFloatingControls { notch.showControls() } else { privacySettings.show() }
         }
         model.nearby.restore()
         model.updates.checkIfDue()
@@ -220,8 +228,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func showPrivacySettings() { notch.closeControls(); privacySettings.show() }
     @objc private func togglePrivacy() { model.toggleInstantShield() }
     @objc private func chooseArea() { model.privacy.chooseArea() }
-    @objc private func toggleNotch() { notch.toggleVisibility() }
-    @objc private func resetNotch() { notch.resetPosition(); notch.show() }
+    private static var showsFloatingControls: Bool { UserDefaults.standard.bool(forKey: "showFloatingControls") }
+
+    /// Unless pinned, the floating controls appear only while a captured blur (instant
+    /// blur, a window, an area, Focus, head-tracking blur) is on, offering a way out.
+    /// The capture-free cover carries its own exit button above them.
+    private func updateFloatingControls() {
+        guard !Self.showsFloatingControls else { return }
+        let privacy = model.privacy
+        let blurring = !model.cover.isCovered && (model.coverage > 0.001 || privacy.fullScreen ||
+            (!privacy.paused && (privacy.selectedWindow != nil || !privacy.protectedAreas.isEmpty || privacy.focusEnabled)))
+        if blurring && !notch.isVisible { notch.show() }
+        else if !blurring && notch.isVisible { notch.hide() }
+    }
+    @objc private func toggleNotch() {
+        notch.toggleVisibility()
+        UserDefaults.standard.set(notch.isVisible, forKey: "showFloatingControls")
+    }
+    @objc private func resetNotch() {
+        notch.resetPosition(); notch.show()
+        UserDefaults.standard.set(true, forKey: "showFloatingControls")
+    }
     @objc private func showAbout() {
         NSApp.activate(ignoringOtherApps: true)
         NSApp.orderFrontStandardAboutPanel(options: [
@@ -240,7 +267,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let url = URL(string: "https://github.com/clintonimaroo/quietglass/\(path)") else { return }
         NSWorkspace.shared.open(url)
     }
-    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { privacySettings.show(); notch.show(); return true }
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        privacySettings.show()
+        if Self.showsFloatingControls { notch.show() }
+        return true
+    }
     func applicationWillTerminate(_ notification: Notification) {
         profilePicker.hide()
         model.shutdown()
