@@ -6,7 +6,7 @@ import Security
 import ShieldCore
 
 enum OwnerSetupError: LocalizedError {
-    case authentication, cancelled, missingTemplate, invalidTemplate, keychain(OSStatus), camera, model
+    case authentication, cancelled, missingTemplate, invalidTemplate, keychain(OSStatus), camera, model, tooManyFaces
     var errorDescription: String? {
         switch self {
         case .authentication: return "Authenticate with Touch ID or your Mac password to continue."
@@ -16,14 +16,15 @@ enum OwnerSetupError: LocalizedError {
         case .keychain: return "Keychain could not securely access your face data. Try again after unlocking your Mac."
         case .camera: return "Camera access is required for owner setup. Allow it in System Settings."
         case .model: return "The recognition model is unavailable. Reinstall QuietGlass; protection will stay on."
+        case .tooManyFaces: return "You can save up to \(FaceProfiles.maximumCount) faces. Delete one to add another."
         }
     }
 }
 
 protocol OwnerTemplateStoring {
     var containsTemplate: Bool { get }
-    func read(context: LAContext) throws -> OwnerTemplate
-    func write(_ template: OwnerTemplate, context: LAContext) throws
+    func read(context: LAContext) throws -> FaceProfiles
+    func write(_ profiles: FaceProfiles, context: LAContext) throws
     func delete(context: LAContext) throws
 }
 
@@ -61,7 +62,7 @@ struct OwnerTemplateStore: OwnerTemplateStoring {
         let status = SecItemCopyMatching(q as CFDictionary, nil)
         return status == errSecSuccess || status == errSecInteractionNotAllowed || status == errSecAuthFailed
     }
-    func read(context: LAContext) throws -> OwnerTemplate {
+    func read(context: LAContext) throws -> FaceProfiles {
         var q = try scopedQuery()
         q[kSecReturnData as String] = true
         q[kSecUseAuthenticationContext as String] = context
@@ -70,14 +71,15 @@ struct OwnerTemplateStore: OwnerTemplateStoring {
         guard status != errSecItemNotFound else { throw OwnerSetupError.missingTemplate }
         guard status == errSecSuccess, var data = result as? Data else { throw OwnerSetupError.keychain(status) }
         defer { data.resetBytes(in: 0..<data.count) }
-        guard data.count < 16_384, let template = try? JSONDecoder().decode(OwnerTemplate.self, from: data), template.isValid else {
+        // Also accepts the single-template payload written by QuietGlass 0.1.x.
+        guard data.count < 131_072, let profiles = FaceProfiles.decode(data) else {
             throw OwnerSetupError.invalidTemplate
         }
-        return template
+        return profiles
     }
-    func write(_ template: OwnerTemplate, context: LAContext) throws {
-        guard template.isValid else { throw OwnerSetupError.invalidTemplate }
-        var data = try JSONEncoder().encode(template)
+    func write(_ profiles: FaceProfiles, context: LAContext) throws {
+        guard profiles.isValid else { throw OwnerSetupError.invalidTemplate }
+        var data = try JSONEncoder().encode(profiles)
         defer { data.resetBytes(in: 0..<data.count) }
         var q = try scopedQuery()
         q[kSecUseAuthenticationContext as String] = context
@@ -118,7 +120,13 @@ final class OwnerRecognition: ObservableObject {
     @Published private(set) var previewSession: AVCaptureSession?
     @Published private(set) var prompt = "Set up your face"
     @Published private(set) var error: String?
-    private(set) var template: OwnerTemplate?
+    /// Names only, for listing saved faces without unlocking the Keychain.
+    @Published private(set) var faces: [FaceSummary]
+    /// Increments after each successful save; the setup sheet closes on change.
+    @Published private(set) var savedCount = 0
+    /// Loaded for a monitoring session only, then discarded.
+    private(set) var profiles: FaceProfiles?
+    private var enrollmentName = FaceProfiles.defaultName
     private let preferences: UserDefaults
     private let store: OwnerTemplateStoring
     private let authenticate: (String) async throws -> LAContext
@@ -141,9 +149,22 @@ final class OwnerRecognition: ObservableObject {
          clock: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }) {
         self.preferences = preferences; self.store = store; self.authenticate = authenticate
         self.cameraAccess = cameraAccess; self.makeCamera = makeCamera; self.clock = clock
-        enrolled = store.containsTemplate
+        let saved = store.containsTemplate
+        enrolled = saved
+        let names = FaceSummary.load(from: preferences)
+        faces = saved && names.isEmpty ? [FaceSummary(id: UUID(), name: FaceProfiles.defaultName)] : names // saved by 0.1.x
         // Do not silently fall back to count-only when a saved template disappears.
         enabled = preferences.bool(forKey: "ownerRecognitionEnabled")
+    }
+
+    var canAddFace: Bool { faces.count < FaceProfiles.maximumCount }
+
+    /// The saved person matching this embedding, if any.
+    func match(_ vector: [Float]) -> FaceProfile? { profiles?.match(vector) }
+
+    private func remember(_ profiles: FaceProfiles?) {
+        faces = profiles?.profiles.map { FaceSummary(id: $0.id, name: $0.name) } ?? []
+        FaceSummary.save(faces, to: preferences)
     }
 
     nonisolated static func authenticateUser(_ reason: String) async throws -> LAContext {
@@ -159,7 +180,7 @@ final class OwnerRecognition: ObservableObject {
         guard !busy, !enrolling, !value || enrolled else { return }
         enabled = value
         preferences.set(value, forKey: "ownerRecognitionEnabled")
-        template = nil
+        profiles = nil
     }
 
     func prepareForMonitoring() async throws {
@@ -175,7 +196,8 @@ final class OwnerRecognition: ObservableObject {
             let loaded = try await Task.detached { try store.read(context: context) }.value
             guard current == token else { throw OwnerSetupError.cancelled }
             guard loaded.isValid else { throw OwnerSetupError.invalidTemplate }
-            template = loaded
+            profiles = loaded
+            remember(loaded)
         } catch {
             if current == token { self.error = error.localizedDescription }
             throw error
@@ -183,14 +205,18 @@ final class OwnerRecognition: ObservableObject {
     }
 
     func endMonitoring() {
-        if saving { template = nil; return }
+        if saving { profiles = nil; return }
         token += 1
-        template = nil
+        profiles = nil
         if enrolling || busy { cancelEnrollment() }
     }
 
-    func beginEnrollment() {
+    /// Adds a face. `name` labels it in Settings ("Me", a partner, an alternate look).
+    func beginEnrollment(name: String = FaceProfiles.defaultName) {
         guard !busy, !enrolling else { return }
+        guard canAddFace else { error = OwnerSetupError.tooManyFaces.localizedDescription; return }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        enrollmentName = trimmed.isEmpty ? FaceProfiles.defaultName : String(trimmed.prefix(40))
         token += 1
         let current = token
         error = nil; busy = true; readyToSave = false
@@ -258,11 +284,21 @@ final class OwnerRecognition: ObservableObject {
         saving = true
         let current = token
         let store = self.store
+        let profile = FaceProfile(name: enrollmentName, template: template)
         Task {
             do {
-                try await Task.detached { try store.write(template, context: context) }.value
+                let saved = try await Task.detached { () throws -> FaceProfiles in
+                    // Append to the existing faces; an unreadable payload is never overwritten.
+                    var profiles = store.containsTemplate ? try store.read(context: context) : FaceProfiles([])
+                    guard profiles.profiles.count < FaceProfiles.maximumCount else { throw OwnerSetupError.tooManyFaces }
+                    profiles.profiles.append(profile)
+                    try store.write(profiles, context: context)
+                    return profiles
+                }.value
                 saving = false
                 guard current == token else { return }
+                remember(saved)
+                savedCount += 1
                 enrolled = true
                 enabled = true
                 preferences.set(true, forKey: "ownerRecognitionEnabled")
@@ -289,8 +325,43 @@ final class OwnerRecognition: ObservableObject {
                 let store = self.store
                 try await Task.detached { try store.delete(context: context) }.value
                 guard current == token else { return }
-                enabled = false; enrolled = false; template = nil; busy = false
+                enabled = false; enrolled = false; profiles = nil; busy = false
+                remember(nil)
                 preferences.set(false, forKey: "ownerRecognitionEnabled")
+            } catch {
+                guard current == token else { return }
+                busy = false; self.error = error.localizedDescription
+            }
+        }
+    }
+
+    /// Removes one saved face; deleting the last one turns Recognize me off.
+    func deleteFace(_ id: UUID) {
+        guard !busy, !enrolling else { return }
+        guard faces.count > 1 else { deleteEnrollment(); return }
+        token += 1
+        let current = token
+        busy = true; error = nil
+        Task {
+            do {
+                let context = try await authenticate("Delete a saved QuietGlass face.")
+                defer { context.invalidate() }
+                guard current == token else { return }
+                let store = self.store
+                let remaining = try await Task.detached { () throws -> FaceProfiles in
+                    var profiles = try store.read(context: context)
+                    profiles.profiles.removeAll { $0.id == id }
+                    if profiles.profiles.isEmpty { try store.delete(context: context) }
+                    else { try store.write(profiles, context: context) }
+                    return profiles
+                }.value
+                guard current == token else { return }
+                busy = false
+                if remaining.profiles.isEmpty {
+                    enabled = false; enrolled = false; profiles = nil
+                    preferences.set(false, forKey: "ownerRecognitionEnabled")
+                    remember(nil)
+                } else { remember(remaining) }
             } catch {
                 guard current == token else { return }
                 busy = false; self.error = error.localizedDescription
@@ -314,5 +385,19 @@ final class OwnerRecognition: ObservableObject {
         cancelEnrollment()
         error = message
         prompt = "Try setup again"
+    }
+}
+
+struct FaceSummary: Codable, Equatable, Identifiable {
+    let id: UUID
+    let name: String
+    private static let key = "faceProfileNames"
+    static func load(from preferences: UserDefaults) -> [FaceSummary] {
+        guard let data = preferences.data(forKey: key) else { return [] }
+        return (try? JSONDecoder().decode([FaceSummary].self, from: data)) ?? []
+    }
+    static func save(_ faces: [FaceSummary], to preferences: UserDefaults) {
+        if faces.isEmpty { preferences.removeObject(forKey: key) }
+        else if let data = try? JSONEncoder().encode(faces) { preferences.set(data, forKey: key) }
     }
 }

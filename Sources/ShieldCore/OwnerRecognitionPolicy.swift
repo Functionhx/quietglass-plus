@@ -223,3 +223,50 @@ public struct OwnerEnrollment {
         }
     }
 }
+
+/// One enrolled person (or an alternate appearance of one), like Face ID's
+/// alternate appearance but for several people who may see the screen.
+public struct FaceProfile: Codable, Equatable, Identifiable {
+    public let id: UUID
+    public var name: String
+    public let template: OwnerTemplate
+    public init(id: UUID = UUID(), name: String, template: OwnerTemplate) {
+        self.id = id; self.name = name; self.template = template
+    }
+}
+
+/// Everything saved in the Keychain: every face allowed to clear protection.
+public struct FaceProfiles: Codable, Equatable {
+    public static let maximumCount = 5
+    public static let defaultName = "Me"
+    public var profiles: [FaceProfile]
+    public init(_ profiles: [FaceProfile]) { self.profiles = profiles }
+
+    public var isValid: Bool {
+        (1...Self.maximumCount).contains(profiles.count) && profiles.allSatisfy { $0.template.isValid } &&
+        Set(profiles.map(\.id)).count == profiles.count
+    }
+
+    /// The best-scoring profile among those that pass the per-template rule.
+    public func match(_ vector: [Float]) -> FaceProfile? {
+        profiles.filter { $0.template.matches(vector) }
+            .max { $0.template.medianSimilarity(vector) < $1.template.medianSimilarity(vector) }
+    }
+
+    /// Reads the current payload, or the single-template payload saved by QuietGlass 0.1.x.
+    public static func decode(_ data: Data) -> FaceProfiles? {
+        let decoder = JSONDecoder()
+        if let value = try? decoder.decode(FaceProfiles.self, from: data), value.isValid { return value }
+        if let legacy = try? decoder.decode(OwnerTemplate.self, from: data), legacy.isValid {
+            return FaceProfiles([FaceProfile(name: defaultName, template: legacy)])
+        }
+        return nil
+    }
+}
+
+extension OwnerTemplate {
+    public func medianSimilarity(_ vector: [Float]) -> Float {
+        let scores = vectors.map { Self.similarity($0, vector) }.sorted()
+        return scores.isEmpty ? -1 : scores[scores.count / 2]
+    }
+}

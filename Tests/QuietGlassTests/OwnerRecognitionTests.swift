@@ -6,20 +6,20 @@ import ShieldCore
 @testable import QuietGlass
 
 private final class MemoryOwnerStore: OwnerTemplateStoring {
-    var value: OwnerTemplate?
+    var value: FaceProfiles?
     var writeCount = 0
     var deleteCount = 0
     var readCount = 0
     var failWrite = false
     var containsTemplate: Bool { value != nil }
-    func read(context: LAContext) throws -> OwnerTemplate {
+    func read(context: LAContext) throws -> FaceProfiles {
         readCount += 1
         guard let value else { throw OwnerSetupError.missingTemplate }
         return value
     }
-    func write(_ template: OwnerTemplate, context: LAContext) throws {
+    func write(_ profiles: FaceProfiles, context: LAContext) throws {
         if failWrite { throw OwnerSetupError.keychain(errSecIO) }
-        value = template; writeCount += 1
+        value = profiles; writeCount += 1
     }
     func delete(context: LAContext) throws { value = nil; deleteCount += 1 }
 }
@@ -47,7 +47,10 @@ private final class OwnerTestCamera: NearbyCameraSession {
     var authCount = 0
     var denyAuth = false
     var vector: [Float] { [1] + Array(repeating: 0, count: 127) }
-    var stored: OwnerTemplate { OwnerTemplate(vectors: Array(repeating: vector, count: 5), openEyes: 0.3) }
+    let storedID = UUID()
+    var stored: FaceProfiles {
+        FaceProfiles([FaceProfile(id: storedID, name: "Me", template: OwnerTemplate(vectors: Array(repeating: vector, count: 5), openEyes: 0.3))])
+    }
     init(enrolled: Bool = true, auth: ((String) async throws -> LAContext)? = nil) {
         preferences = UserDefaults(suiteName: suite)!
         if enrolled { store.value = stored; preferences.set(true, forKey: "ownerRecognitionEnabled") }
@@ -103,7 +106,7 @@ final class OwnerRecognitionTests: XCTestCase {
         let original = h.cameras[0]
         h.nearby.suspend(for: .inactiveSession)
         XCTAssertTrue(original.stopped)
-        XCTAssertNil(h.owner.template)
+        XCTAssertNil(h.owner.profiles)
         XCTAssertTrue(h.nearby.wantsMonitoring)
         h.nearby.resume(after: .inactiveSession)
         await h.wait { h.cameras.count == 2 }
@@ -119,7 +122,7 @@ final class OwnerRecognitionTests: XCTestCase {
     @MainActor func testOwnerStartsCoveredAndDifferentSingleFaceNeverClears() async {
         let h = OwnerRig(); defer { h.finish() }
         XCTAssertTrue(h.cameras.isEmpty)
-        XCTAssertNil(h.owner.template)
+        XCTAssertNil(h.owner.profiles)
         h.nearby.setEnabled(true)
         XCTAssertTrue(h.nearby.covered)
         await h.wait { !h.cameras.isEmpty }
@@ -133,7 +136,7 @@ final class OwnerRecognitionTests: XCTestCase {
         XCTAssertFalse(h.nearby.covered)
         XCTAssertEqual(h.authCount, 1)
         h.nearby.stop()
-        XCTAssertNil(h.owner.template)
+        XCTAssertNil(h.owner.profiles)
         XCTAssertTrue(h.cameras[0].stopped)
     }
 
@@ -144,7 +147,7 @@ final class OwnerRecognitionTests: XCTestCase {
         let old = h.cameras[0]
         old.completion(.failure(.disconnected)); await h.settle()
         XCTAssertTrue(h.nearby.covered)
-        XCTAssertNil(h.owner.template)
+        XCTAssertNil(h.owner.profiles)
         h.nearby.retry()
         await h.wait { h.cameras.count == 2 }
         XCTAssertEqual(h.authCount, 2)
@@ -191,7 +194,7 @@ final class OwnerRecognitionTests: XCTestCase {
         h.nearby.stop()
         continuation?.resume(returning: LAContext())
         await h.settle()
-        XCTAssertNil(h.owner.template)
+        XCTAssertNil(h.owner.profiles)
         XCTAssertTrue(h.cameras.isEmpty)
         XCTAssertFalse(h.nearby.covered)
     }
@@ -298,7 +301,7 @@ final class OwnerRecognitionTests: XCTestCase {
         XCTAssertTrue(h.owner.enrolled)
         XCTAssertTrue(h.owner.enabled)
         XCTAssertEqual(h.store.writeCount, 1)
-        XCTAssertNil(h.owner.template, "Stored embeddings should not be kept between sessions")
+        XCTAssertNil(h.owner.profiles, "Stored embeddings should not be kept between sessions")
         h.owner.deleteEnrollment()
         await h.wait { !h.owner.busy }
         XCTAssertNil(h.store.value)
@@ -324,6 +327,25 @@ final class OwnerRecognitionTests: XCTestCase {
         XCTAssertEqual(h.store.value, h.stored)
         XCTAssertTrue(h.owner.enabled)
         XCTAssertEqual(h.store.deleteCount, 0)
+    }
+
+    @MainActor func testAddingAFaceKeepsExistingFacesAndDeletingOneKeepsTheRest() async {
+        let h = OwnerRig(); defer { h.finish() }
+        h.owner.beginEnrollment(name: "Partner")
+        await h.wait { h.owner.enrolling }
+        for _ in 0..<5 { await h.send(advance: 0.3) }
+        await h.passChallenge(enrollment: true)
+        h.owner.saveEnrollment()
+        await h.wait { !h.owner.busy }
+        XCTAssertEqual(h.store.value?.profiles.map(\.name), ["Me", "Partner"])
+        XCTAssertEqual(h.owner.faces.map(\.name), ["Me", "Partner"])
+        XCTAssertEqual(h.owner.savedCount, 1)
+        let partner = try! XCTUnwrap(h.owner.faces.last)
+        h.owner.deleteFace(partner.id)
+        await h.wait { !h.owner.busy }
+        XCTAssertEqual(h.store.value?.profiles.map(\.name), ["Me"])
+        XCTAssertEqual(h.owner.faces.map(\.name), ["Me"])
+        XCTAssertTrue(h.owner.enabled, "Deleting one of several faces keeps Recognize me on")
     }
 
     @MainActor func testFailedReplacementWritePreservesSavedTemplate() async {
@@ -354,7 +376,7 @@ final class OwnerRecognitionTests: XCTestCase {
         h.nearby.checkCameraHealth()
         XCTAssertEqual(h.nearby.status, .unavailable(.stalled))
         XCTAssertTrue(h.nearby.covered)
-        XCTAssertNil(h.owner.template)
+        XCTAssertNil(h.owner.profiles)
     }
 
     func testRealKeychainRoundTripInAnIsolatedTemporaryKeychain() throws {
@@ -373,13 +395,15 @@ final class OwnerRecognitionTests: XCTestCase {
         let vector: [Float] = [1] + Array(repeating: 0, count: 127)
         let original = OwnerTemplate(vectors: Array(repeating: vector, count: 5), openEyes: 0.3)
         XCTAssertFalse(store.containsTemplate)
-        try store.write(original, context: LAContext())
+        let me = FaceProfile(name: "Me", template: original)
+        try store.write(FaceProfiles([me]), context: LAContext())
         XCTAssertTrue(store.containsTemplate)
-        XCTAssertEqual(try store.read(context: LAContext()), original)
-        let replacement = OwnerTemplate(vectors: Array(repeating: vector, count: 5), openEyes: 0.28)
+        XCTAssertEqual(try store.read(context: LAContext()), FaceProfiles([me]))
+        let replacement = FaceProfiles([me, FaceProfile(name: "Partner", template: OwnerTemplate(vectors: Array(repeating: vector, count: 5), openEyes: 0.28))])
         try store.write(replacement, context: LAContext())
         XCTAssertEqual(try store.read(context: LAContext()), replacement)
-        XCTAssertThrowsError(try store.write(OwnerTemplate(vectors: [], openEyes: 0.3), context: LAContext()))
+        XCTAssertThrowsError(try store.write(FaceProfiles([FaceProfile(name: "Bad", template: OwnerTemplate(vectors: [], openEyes: 0.3))]), context: LAContext()))
+        XCTAssertThrowsError(try store.write(FaceProfiles([]), context: LAContext()))
         XCTAssertEqual(try store.read(context: LAContext()), replacement)
         try store.delete(context: LAContext())
         XCTAssertFalse(store.containsTemplate)

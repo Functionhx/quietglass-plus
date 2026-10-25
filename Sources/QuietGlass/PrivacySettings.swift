@@ -570,22 +570,36 @@ private struct PrivacySettingsView: View {
             }
             if model.nearby.owner.enrolled || model.nearby.owner.enabled || showingOwnerDeletion {
                 divider
-                row("Saved face", detail: "Stored in this Mac’s Keychain. Touch ID or your Mac password is required when monitoring starts.") {
-                    HStack(spacing: 8) {
-                        Button("Set up again") { model.nearby.stop(); settingUpOwner = true }
-                            .disabled(showingOwnerDeletion)
+                row("Saved faces", detail: "Anyone saved here can clear protection. Stored in this Mac’s Keychain; Touch ID or your Mac password is required to add, delete or use them.") {
+                    Button("Add a face") { model.nearby.stop(); settingUpOwner = true }
+                        .disabled(!model.nearby.owner.canAddFace || model.nearby.owner.busy)
+                }
+                ForEach(model.nearby.owner.faces) { face in
+                    HStack(spacing: 10) {
+                        Image(systemName: "person.crop.circle").foregroundStyle(.secondary)
+                        Text(face.name)
+                        Spacer()
                         InlineDeleteButton(
                             isBusy: model.nearby.owner.busy,
-                            isDeleted: !model.nearby.owner.enrolled && !model.nearby.owner.enabled,
+                            isDeleted: !model.nearby.owner.faces.contains(face),
                             onConfirm: {
                                 showingOwnerDeletion = true
                                 model.nearby.stop()
-                                model.nearby.owner.deleteEnrollment()
+                                model.nearby.owner.deleteFace(face.id)
                             },
                             onFinished: { showingOwnerDeletion = false }
                         )
                     }
-                }.disabled(model.nearby.owner.busy)
+                    .padding(.leading, 4)
+                    .disabled(model.nearby.owner.busy)
+                }
+                divider
+                row("Saved faces aren’t onlookers", detail: "When everyone in view is saved, the screen stays clear. Turn off to cover whenever a second face appears.") {
+                    Toggle("Saved faces aren’t onlookers", isOn: Binding(
+                        get: { model.nearby.trustSavedFaces },
+                        set: { model.nearby.setTrustSavedFaces($0) }
+                    )).labelsHidden()
+                }
             }
             if let error = model.nearby.owner.error {
                 divider

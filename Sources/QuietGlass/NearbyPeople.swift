@@ -142,6 +142,8 @@ final class NearbyPeople: ObservableObject {
     private var ownerNoticeCandidateSince: TimeInterval = 0
     private var pauseReasons: Set<NearbyPauseReason> = []
     private var analysisRate = AnalysisRate.responsive
+    /// Saved faces other than the one at the screen do not count as onlookers.
+    @Published private(set) var trustSavedFaces: Bool
     private var cameraObservers: [NSObjectProtocol] = []
 
     init(preferences: UserDefaults = .standard,
@@ -162,6 +164,7 @@ final class NearbyPeople: ObservableObject {
         wantsMonitoring = preferences.bool(forKey: "nearbyEnabled")
         response = NearbyResponse(rawValue: preferences.string(forKey: "nearbyResponse") ?? "") ?? .blur
         warningSoundEnabled = preferences.object(forKey: "nearbyWarningSound") as? Bool ?? true
+        trustSavedFaces = preferences.object(forKey: "trustSavedFaces") as? Bool ?? true
         warningDelay = NearbyWarningPolicy.normalizedDelay(
             preferences.object(forKey: "nearbyWarningDelay") as? Double ?? NearbyWarningPolicy.defaultDelay)
         if wantsMonitoring, let until = preferences.object(forKey: "nearbyPauseUntil") as? Date, until > wallClock() {
@@ -273,6 +276,13 @@ final class NearbyPeople: ObservableObject {
         warningDelay = value
         preferences.set(value, forKey: "nearbyWarningDelay")
         updateProtection()
+    }
+
+    func setTrustSavedFaces(_ value: Bool) {
+        guard trustSavedFaces != value else { return }
+        trustSavedFaces = value
+        preferences.set(value, forKey: "trustSavedFaces")
+        attention = NearbyAttentionPolicy()
     }
 
     func setWarningSoundEnabled(_ value: Bool) {
@@ -449,24 +459,35 @@ final class NearbyPeople: ObservableObject {
         lastFrame = sample.capturedAt
         let ownerIndices = sample.identities.indices.filter { index in
             guard let identity = sample.identities[index] else { return false }
-            return owner.template?.matches(identity.vector) == true && identity.pose.isValid
+            return owner.match(identity.vector) != nil && identity.pose.isValid
         }
-        let ownerIndex = ownerIndices.count == 1 ? ownerIndices.first : nil
+        // Upstream treats exactly one matching face as the owner. With several saved
+        // people trusted, the largest matching face is the owner and the other saved
+        // faces are companions, invisible to the onlooker checks.
+        let trusting = ownerRequired && trustSavedFaces
+        func area(_ index: Int) -> CGFloat {
+            sample.bounds.indices.contains(index) ? sample.bounds[index].width * sample.bounds[index].height : 0
+        }
+        let ownerIndex = trusting ? ownerIndices.max { area($0) < area($1) } : ownerIndices.count == 1 ? ownerIndices.first : nil
+        let companions = trusting ? Set(ownerIndices).subtracting(ownerIndex.map { [$0] } ?? []) : []
         let facingThreat: Bool
         if let faces = sample.faces {
-            facingThreat = attention.observe(faces, ownerIndex: ownerRequired ? ownerIndex : nil, at: sample.capturedAt)
-        } else { facingThreat = sample.count > 1 }
-        let extraThreat = detection == .anyFace ? sample.count > 1 : facingThreat
+            let kept = faces.indices.filter { !companions.contains($0) }
+            let keptOwner = ownerIndex.flatMap { kept.firstIndex(of: $0) }
+            facingThreat = attention.observe(kept.map { faces[$0] }, ownerIndex: ownerRequired ? keptOwner : nil, at: sample.capturedAt)
+        } else { facingThreat = sample.count - companions.count > 1 }
+        let extraThreat = detection == .anyFace ? sample.count - companions.count > 1 : facingThreat
         let detected: Bool
         if ownerRequired {
             let identity = ownerIndex.flatMap { sample.identities[$0] }
             let vector = identity?.vector ?? (sample.count == 1 ? sample.vector : nil)
             let pose = identity?.pose ?? (sample.count == 1 ? sample.pose : nil)
-            let ownerMatches = !extraThreat && vector.map { owner.template?.matches($0) == true } == true && pose?.isValid == true
+            let matchedFace = vector.flatMap { owner.match($0) }
+            let ownerMatches = !extraThreat && matchedFace != nil && pose?.isValid == true
             let ownerBounds = ownerIndex.flatMap { sample.bounds.indices.contains($0) ? sample.bounds[$0] : nil } ?? (sample.count == 1 ? sample.bounds.first : nil)
             let lostLandmarks = sample.count == 1 && (vector == nil || pose?.isValid != true) &&
                 OwnerPresence.isContinuousFace(lastMatchedBounds, ownerBounds)
-            detected = ownerPresence.observe(matches: ownerMatches, pose: pose, openEyes: owner.template?.openEyes ?? 0.3,
+            detected = ownerPresence.observe(matches: ownerMatches, pose: pose, openEyes: matchedFace?.template.openEyes ?? 0.3,
                                              at: sample.capturedAt, continuousFaceWithMissingLandmarks: lostLandmarks)
             if ownerMatches { lastMatchedBounds = ownerBounds }
             else if !lostLandmarks { lastMatchedBounds = nil }

@@ -4,19 +4,20 @@ import AVFoundation
 struct OwnerEnrollmentView: View {
     @ObservedObject var owner: OwnerRecognition
     @Environment(\.dismiss) private var dismiss
+    @State private var name = ""
 
     var body: some View {
         OwnerEnrollmentScreen(
             scanning: owner.enrolling && !owner.readyToSave, ready: owner.readyToSave,
             busy: owner.busy, prompt: owner.prompt, progress: owner.enrollmentProgress, error: owner.error,
             previewSession: owner.previewSession,
+            name: $name, firstFace: owner.faces.isEmpty,
             cancel: { owner.cancelEnrollment(); dismiss() },
-            action: { owner.readyToSave ? owner.saveEnrollment() : owner.beginEnrollment() }
+            action: { owner.readyToSave ? owner.saveEnrollment() : owner.beginEnrollment(name: name) }
         )
         .interactiveDismissDisabled(owner.busy && owner.readyToSave)
-        .onChange(of: owner.prompt) { _, value in
-            if value == "Your face is saved securely" { dismiss() }
-        }
+        .onAppear { if name.isEmpty { name = owner.faces.isEmpty ? String(localized: "Me") : "" } }
+        .onChange(of: owner.savedCount) { _, _ in dismiss() }
         .onDisappear { owner.cancelEnrollment() }
     }
 }
@@ -30,6 +31,8 @@ struct OwnerEnrollmentScreen: View {
     let progress: Double
     let error: String?
     var previewSession: AVCaptureSession? = nil
+    var name: Binding<String>? = nil
+    var firstFace = true
     var cancel: () -> Void
     var action: () -> Void
     @State private var showingDetails = false
@@ -40,13 +43,15 @@ struct OwnerEnrollmentScreen: View {
         if ready { return "Ready when you are" }
         if scanning { return prompt }
         if busy { return "Confirm it’s you" }
-        return error == nil ? "Recognize me" : "Let’s try that again"
+        if error != nil { return "Let’s try that again" }
+        return firstFace ? "Recognize me" : "Add a face"
     }
     private var subtitle: String {
         if ready { return "Save your face to use owner recognition.\nYour camera is now off." }
         if scanning { return "A small head turn is enough. Blink naturally." }
         if busy { return "Use Touch ID or your Mac password\nto continue securely." }
-        return "Set up your face so QuietGlass can check\nit’s you before clearing protection."
+        return firstFace ? "Set up your face so QuietGlass can check\nit’s you before clearing protection."
+            : "Add someone you trust, or another look of yours\n(glasses, different lighting)."
     }
 
     var body: some View {
@@ -86,6 +91,12 @@ struct OwnerEnrollmentScreen: View {
                     }
                     .padding(.top, 22).accessibilityElement(children: .ignore)
                     .accessibilityLabel("Face setup progress").accessibilityValue("\(Int(progress * 100)) percent")
+                }
+                if let name, !scanning, !ready, !busy {
+                    TextField("Name", text: name, prompt: Text("Name, e.g. Me, Alex, With glasses"))
+                        .textFieldStyle(.roundedBorder)
+                        .frame(maxWidth: 240)
+                        .padding(.top, 18)
                 }
                 if let error {
                     Text(error).font(.system(size: 12)).foregroundStyle(.orange).multilineTextAlignment(.center)
