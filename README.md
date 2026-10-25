@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="media/readme/banner-dark.jpg">
+  <img alt="QuietGlass Plus: a laptop whose screen is folding closed behind a privacy sheet" src="media/readme/banner-light.jpg">
+</picture>
+
 # QuietGlass Plus
 
 **A low-power privacy screen for macOS that covers your display when you step away — and, if you like, clears only for faces you've saved.**
@@ -12,12 +17,37 @@ QuietGlass Plus is a fork of [QuietGlass](https://github.com/clintonimaroo/quiet
 | | **Away** (default) · 离开模式（默认） | **Recognize me** · 识别本人 |
 |---|---|---|
 | Covers when | no face for 3–30 s (default 5) | you leave, a stranger appears, or an extra face looks on |
-| Clears when | you press **Esc** + Touch ID (or the cover's button) | a saved face is recognized (optional head turn) |
+| Clears when | any key within a minute; then **Esc** + Touch ID | a saved face is recognized (optional head turn) |
 | Camera while you work | face detection only, 2/s | detection + recognition, 3/s steady, 10/s while verifying |
 | Camera while covered | **off** | on, waiting for you |
 | Recognition model | not loaded | SFace on the Neural Engine |
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="media/readme/away-flow-dark.jpg">
+  <img alt="Away mode in five steps: at your Mac, stepping away for 5 seconds, covered on the first frame, camera off and black after 15 seconds, back with any key" src="media/readme/away-flow-light.jpg">
+</picture>
+
+Away mode, step by step: the camera only asks *is there a face?* twice a second. After 5 s with nobody in view the screen is covered and the camera switches off. Within the first minute any key unlocks; after that, Esc plus Touch ID (both limits are adjustable).
+
 Either mode can lock macOS after N minutes away. Head tracking (look away → cover) works with the camera, AirPods, or Sony/Android head-tracker earbuds.
+
+### Also in away mode / 离开模式附带
+
+- **Peek alert (偷窥提醒).** Like Honor phones: when someone else faces your screen for a moment, a pill appears below the notch — or the screen blurs until they look away. It reuses upstream's facing-screen policy, so people walking past don't trigger it.
+- **Posture reminders (坐姿提醒).** A laptop camera rarely sees your shoulders, so posture comes from your face relative to a calibrated baseline: it grows when you lean in, sinks when you slump, rolls when you tilt your head. A problem has to last a minute, reminders repeat at most every ten minutes, and they never cover the screen. Both features reuse the same camera frames, so they cost nothing extra.
+
+<p align="center"><img alt="Camera protection settings in Simplified Chinese: protection mode, master switch, delay, peek alert, posture reminders, any-key window" src="media/readme/settings-zh.jpg" width="760"></p>
+
+## Covers / 遮挡效果
+
+<p align="center"><img alt="The fold cover: two smoked-glass halves unfold from a glowing center hinge, then fold back to reveal the desktop" src="media/readme/fold.gif" width="560"></p>
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="media/readme/covers-dark.jpg">
+  <img alt="Four cover styles: fold, curtain, frosted and black" src="media/readme/covers-light.jpg">
+</picture>
+
+Every style is opaque on its first frame — the animation plays over a screen that is already hidden. *Captured blur* (upstream's adjustable blur, which needs screen recording) remains available for manual, window and area protection.
 
 ## How it works / 原理
 
@@ -39,15 +69,21 @@ flowchart LR
 - **Escape is borrowed only while something is covered.** Upstream registered Esc as a global hotkey whenever monitoring was on, which broke Esc in every app and turned protection off on a stray keypress.
 - **Earbud head tracking** reads Android's head-tracker HID report (rotation vector, angular velocity, reset counter) with IOHIDManager. Earbuds sit tilted in the ear, so covering uses the frame-independent rotation from the calibrated center.
 
-## Measured on a MacBook Air (M4)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="media/readme/earbuds-dark.svg">
+  <img alt="Real Sony WF-1000XM6 data over 25 seconds: a right turn to minus 55 degrees and a look down to minus 20 degrees, each shaded as screen covered" src="media/readme/earbuds-light.svg">
+</picture>
 
-| | QuietGlass 0.1.2 | Plus |
-|---|---|---|
-| Camera sensor rate | 30 fps (its 10 fps request is outside the camera's 15–30 range) | 15 fps |
-| `cameracaptured` CPU | ~21 % | ~10 % — and 0 % while away |
-| SFace embedding | 4.5 ms, CPU | 0.85 ms, Neural Engine (cosine vs CPU > 0.999) |
-| Screen recording while monitoring | 30 fps, full resolution | none |
-| App CPU while head tracking | ~29 % (UI redrawn every sample) | ~1 % |
+Real data from a WF-1000XM6 (after the 12 s warm-up): turning right and looking down at the keyboard both leave the ±15° range and cover the screen. Each new audio stream resets the earbuds' reference frame; QuietGlass stitches across resets so a calibrated center stays valid.
+
+## Measured on a MacBook Air (M4) / 实测功耗
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="media/readme/power-dark.svg">
+  <img alt="Measured: camera sensor 30 to 15 fps; cameracaptured CPU 21 to 10 percent; SFace embedding 4.5 to 0.85 ms; screen recording while monitoring 30 fps to none; app CPU while head tracking 29 to 1 percent" src="media/readme/power-light.svg">
+</picture>
+
+The camera is what costs power, not the AI: halving the sensor rate halves `cameracaptured`, and in away mode the camera is simply off while you're gone. Upstream's 10 fps request was outside the built-in camera's 15–30 fps range, so it captured at 30 fps; its owner recognition ran on the CPU for every face in every frame; and it kept a full-resolution screen recording warm while monitoring. SFace now runs on the Neural Engine, verified against the CPU path (cosine > 0.999).
 
 Reproduce with `scripts/measure-power.sh` and `scripts/bench-pipeline.swift`.
 
@@ -62,13 +98,14 @@ ditto dist/QuietGlass.app /Applications/QuietGlass.app
 
 Then open **Settings → Protection**, choose a protection mode and turn on **Detect additional faces** (the master switch; 中文界面为“摄像头自动保护（总开关）”).
 
-Requires Xcode 26 or later. `swift test` runs ~200 unit tests (ShieldCore policies, owner recognition, away monitor, earbud stitching, real Vision + SFace fixtures).
+Requires Xcode 26 or later. `swift test` runs 210 unit tests (ShieldCore policies, owner recognition, away monitor, earbud stitching, real Vision + SFace fixtures).
 
 ## What's new in this fork
 
 | Area | Files |
 |---|---|
-| Away mode | `Sources/ShieldCore/AwayPolicy.swift`, `Sources/QuietGlass/AwayMonitor.swift` |
+| Away mode, any-key window, peek alert | `Sources/ShieldCore/AwayPolicy.swift`, `Sources/QuietGlass/AwayMonitor.swift`, `PeekAlert.swift` |
+| Posture reminders | `Sources/ShieldCore/PosturePolicy.swift` |
 | Capture-free covers | `Sources/QuietGlass/PrivacyCover.swift` |
 | Up to 5 saved faces, migration from 0.1.x | `FaceProfile`/`FaceProfiles` in `OwnerRecognitionPolicy.swift`, `OwnerTemplateStore.swift` |
 | Adaptive camera rate, Neural Engine | `NearbyPeople.swift` (`FaceCamera`), `SharedFaceCamera.swift`, `OwnerFaceModel.swift` |
@@ -82,7 +119,10 @@ Developer aids:
 QuietGlass.app/Contents/MacOS/QuietGlass --preview-cover fold   # fold | frosted | curtain | black
 QuietGlass.app/Contents/MacOS/QuietGlass --headphone-check      # voice-guided earbud test
 python3 scripts/gen-localization.py --missing                   # untranslated UI strings
+QuietGlass.app/Contents/MacOS/QuietGlass --preview-peek          # the peek alert pill
 ```
+
+README images are reproducible: `media/readme/src/kit.html` renders each frame (headless Chrome) and `media/readme/src/charts.py` writes the charts.
 
 ## Privacy and limits / 隐私与局限
 

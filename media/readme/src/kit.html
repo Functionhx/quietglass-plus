@@ -25,7 +25,7 @@
   .pill { font: 600 15px var(--font); padding: 8px 14px; border-radius: 99px; border: 1px solid var(--line); background: var(--glass); color: var(--muted); }
   .label { text-align: center; font: 600 20px var(--font); margin-top: 16px; color: var(--ink); }
   .sub { text-align: center; font: 15px var(--font); color: var(--muted); margin-top: 4px; }
-  .num { position: absolute; top: 12px; left: 14px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  .stepno { position: absolute; top: 12px; left: 14px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
          font: 700 13px var(--font); color: #120916; background: linear-gradient(135deg, #fff, var(--pink)); z-index: 40; }
   .cam { position: absolute; right: 8px; bottom: 8px; z-index: 40; font: 600 11px var(--mono); padding: 4px 8px; border-radius: 6px;
          background: rgba(0,0,0,.65); color: #fff; display: flex; gap: 6px; align-items: center; }
@@ -42,8 +42,7 @@
   .keycap span { font: 600 13px var(--font); color: #fff; opacity: .8; }
 </style>
 <script>
-  const q = new URLSearchParams(location.search);
-  document.documentElement.dataset.theme = q.get("theme") || "dark";
+  document.documentElement.dataset.theme = new URLSearchParams(location.search).get("theme") || "dark";
 </script>
 </head>
 <body>
@@ -96,7 +95,7 @@ if (shot === "banner") {
       <p class="tag">${T("A low-power privacy screen for macOS. Step away and it covers on the first frame; come back and press any key.", "为 Mac 打造的低功耗隐私屏。离开即遮挡，回来按任意键解锁。")}</p>
       <div class="pills"><span class="pill">macOS 14+</span><span class="pill">Neural Engine</span><span class="pill">${T("On-device", "全部本地")}</span><span class="pill">MIT</span></div>
     </div>
-    <div style="position:absolute; right:70px; top:70px">${laptop({ covered: true, t: .55 }, { width: 760, fs: 8.5 })}</div>`;
+    <div style="position:absolute; right:70px; top:70px">${laptop({ covered: true, t: +(q.get("t") || .3) }, { width: 760, fs: 8.5 })}</div>`;
 } else if (shot === "styles") {
   const cell = (style, name, desc) => `<div style="width:700px">${laptop({ style, covered: true, t: 1, badge: [T("Privacy protected", "隐私保护中"), name, ""] }, { width: 700, fs: 8 })}
     <div class="label">${name}</div><div class="sub">${desc}</div></div>`;
@@ -109,12 +108,12 @@ if (shot === "banner") {
   const steps = [
     [{ covered: false }, T("At your Mac", "你在电脑前"), T("Face check, 2×/s", "人脸检测 2 次/秒"), `<div class="facebox"></div><div class="cam"><i></i>2 fps</div>`],
     [{ covered: false }, T("You step away", "你起身离开"), T("No face for 5 s", "连续 5 秒没有人脸"), `<div class="ring">3</div><div class="cam"><i></i>2 fps</div>`],
-    [{ covered: true, t: 1 }, T("Covered", "遮挡"), T("Opaque on frame one", "第一帧就盖住"), `<div class="cam"><i></i>…</div>`],
+    [{ covered: true, t: 1 }, T("Covered", "遮挡"), T("Opaque on frame one", "第一帧就盖住"), ``],
     [{ covered: true, t: 1, black: true, led: false }, T("Camera off", "摄像头关闭"), T("Black after 15 s", "15 秒后转为纯黑"), `<div class="cam off"><i></i>OFF</div>`],
     [{ covered: false }, T("Back", "回来"), T("Any key · Touch ID after 1 min", "任意键 · 超过 1 分钟需 Touch ID"), `<div class="keycap"><kbd>${T("any key", "任意键")}</kbd><span>→</span><kbd>🔓</kbd></div><div class="cam"><i></i>2 fps</div>`],
   ];
   root.innerHTML = `<div style="position:absolute; inset:40px 40px; display:grid; grid-template-columns:repeat(5,1fr); gap:28px">${steps.map(([st, a, b, extra], i) =>
-    `<div style="position:relative"><span class="num">${i + 1}</span>${laptop(st, { width: 330, fs: 3.8, extra })}<div class="label" style="font-size:18px">${a}</div><div class="sub" style="font-size:14px">${b}</div></div>`).join("")}</div>`;
+    `<div style="position:relative"><span class="stepno">${i + 1}</span>${laptop(st, { width: 330, fs: 3.8, extra })}<div class="label" style="font-size:18px">${a}</div><div class="sub" style="font-size:14px">${b}</div></div>`).join("")}</div>`;
 } else if (shot === "fold") {
   const t = parseFloat(q.get("t") || "1");
   const covered = q.get("covered") !== "0";
