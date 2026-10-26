@@ -229,6 +229,29 @@ private final class FakeCamera: NearbyCameraSession {
         XCTAssertEqual(prompts.last, true)
     }
 
+    func testASegmentedPersonWithoutAFaceIsStillPresent() async throws {
+        try XCTSkipIf(AVCaptureAuthorization.denied, "camera access denied for the test runner")
+        let monitor = makeMonitor()
+        monitor.setEnabled(true)
+        await wait { !self.cameras.isEmpty }
+        for _ in 0..<30 {   // 15 s slumped, face never detected, perfectly still
+            now += 0.5
+            var sample = NearbyFaceSample(count: 0, capturedAt: now)
+            sample.people = 0; sample.motion = 0; sample.personCoverage = 0.3
+            cameras.last!.completion(.success(sample))
+            for _ in 0..<10 { await Task.yield() }
+        }
+        XCTAssertFalse(monitor.covered)
+        for _ in 0..<12 {   // the chair is empty
+            now += 0.5
+            var sample = NearbyFaceSample(count: 0, capturedAt: now)
+            sample.people = 0; sample.motion = 0; sample.personCoverage = 0.004
+            cameras.last!.completion(.success(sample))
+            for _ in 0..<10 { await Task.yield() }
+        }
+        XCTAssertTrue(monitor.covered)
+    }
+
     func testScreenUnlockClearsAnAwayCover() async throws {
         try XCTSkipIf(AVCaptureAuthorization.denied, "camera access denied for the test runner")
         let monitor = makeMonitor()

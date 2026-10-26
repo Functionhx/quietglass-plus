@@ -446,6 +446,7 @@
 "Peek alert" = "偷窥提醒";
 "Peeking at your screen" = "正在偷看屏幕";
 "Per-display head tracking" = "分屏头部追踪";
+"Person in frame" = "人像占比";
 "Phrases to protect" = "要保护的短语";
 "Picture change" = "画面变化";
 "Play warning sound" = "播放提醒音效";
@@ -748,6 +749,7 @@
 "macOS asked before sharing your saved faces with protection. Confirm once with Touch ID or your Mac password." = "macOS 需要你确认后才能让保护功能读取已保存的面孔。请用 Touch ID 或 Mac 密码确认一次。";
 "macOS needs screen access restored for this copy of QuietGlass. Enable it in Screen Settings, then restart the app." = "macOS 需要为此 QuietGlass 副本恢复屏幕录制权限。请在屏幕录制设置中开启，然后重新启动 App。";
 "no face ≥ %d s and still ≥ 5 s" = "无脸 ≥ %d 秒且静止 ≥ 5 秒";
+"not needed (face seen)" = "无需计算（已见到脸）";
 "profile home office public focus full screen demo recording shortcut privacy appearance blur strength preview launch login updates" = "profile home office public focus full screen demo recording shortcut privacy appearance blur strength preview launch login updates 情景 家 办公室 公共 专注 全屏 演示 录制 快捷键 隐私 外观 模糊 强度 预览 登录 启动 更新 语言";
 "right" = "右侧";
 "saved area" = "已保存的区域";

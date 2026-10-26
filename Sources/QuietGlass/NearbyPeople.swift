@@ -63,6 +63,9 @@ struct NearbyFaceSample {
     /// Fraction of a 40×30 brightness grid that changed since the previous analyzed
     /// frame (presence mode). A person whose face isn't detected still moves.
     var motion: Double? = nil
+    /// Share of the frame covered by a person (Vision person segmentation), measured
+    /// only when no face was found: you sitting crooked or face-down still count.
+    var personCoverage: Double? = nil
 }
 
 struct CameraIdentity {
@@ -704,6 +707,12 @@ final class FaceCamera: NSObject, NearbyCameraSession, AVCaptureVideoDataOutputS
     private var recognition = false
     private var presence = false
     private var previousGrid: [UInt8]?
+    private lazy var segmentation: VNGeneratePersonSegmentationRequest = {
+        let request = VNGeneratePersonSegmentationRequest()
+        request.qualityLevel = .fast
+        request.outputPixelFormat = kCVPixelFormatType_OneComponent8
+        return request
+    }()
     private var recognizer: OwnerFaceModel?
     private var deviceID: String?
 
@@ -772,6 +781,19 @@ final class FaceCamera: NSObject, NearbyCameraSession, AVCaptureVideoDataOutputS
                 limitFrameRate(device)
             } catch { completion(.failure(error as? NearbyCameraFailure ?? .configuration)) }
         }
+    }
+
+    private func personCoverage(in buffer: CVPixelBuffer) -> Double? {
+        guard (try? VNImageRequestHandler(cvPixelBuffer: buffer, orientation: .up, options: [:]).perform([segmentation])) != nil,
+              let mask = segmentation.results?.first?.pixelBuffer else { return nil }
+        CVPixelBufferLockBaseAddress(mask, .readOnly); defer { CVPixelBufferUnlockBaseAddress(mask, .readOnly) }
+        guard let base = CVPixelBufferGetBaseAddress(mask)?.assumingMemoryBound(to: UInt8.self) else { return nil }
+        let width = CVPixelBufferGetWidth(mask), height = CVPixelBufferGetHeight(mask), stride = CVPixelBufferGetBytesPerRow(mask)
+        var on = 0, total = 0
+        for y in Swift.stride(from: 0, to: height, by: 4) {
+            for x in Swift.stride(from: 0, to: width, by: 4) { total += 1; if base[y * stride + x] > 127 { on += 1 } }
+        }
+        return total > 0 ? Double(on) / Double(total) : nil
     }
 
     /// Samples 1,200 points of the luma plane (no conversion, ~microseconds) and returns
@@ -852,7 +874,12 @@ final class FaceCamera: NSObject, NearbyCameraSession, AVCaptureVideoDataOutputS
                 }
                 var sample = NearbyFaceSample(count: faces.count, capturedAt: now, bounds: faces.map(\.boundingBox))
                 sample.people = people
-                if presence { sample.motion = motion(in: buffer) }
+                if presence {
+                    sample.motion = motion(in: buffer)
+                    // Faces are cheaper to trust; segment the person only when none was found
+                    // (~11 ms on the Neural Engine, measured on an M4).
+                    if (people ?? faces.count) == 0 { sample.personCoverage = personCoverage(in: buffer) }
+                }
                 sample.faces = faces.map { CameraFace(bounds: $0.boundingBox, yaw: $0.yaw?.doubleValue, pitch: $0.pitch?.doubleValue, roll: $0.roll?.doubleValue) }
                 if recognition {
                     guard let recognizer else { throw OwnerModelError.unavailable }

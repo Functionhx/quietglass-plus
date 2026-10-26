@@ -78,6 +78,7 @@ private struct DebugView: View {
                 reading("State", away.covered ? (away.coverReason == .stranger ? L("Covered · stranger") : L("Covered · away")) : away.watching ? L("Watching") : L("Off"))
                 reading("Recognize me", away.recognizing ? L("On") : L("Off"))
                 reading("Faces (strict / loose)", "\(away.debugFrame.strictFaces) / \(away.debugFrame.looseFaces)")
+                reading("Person in frame", away.debugFrame.personCoverage.map { String(format: "%.0f %%", $0 * 100) } ?? L("not needed (face seen)"))
                 reading("Picture change", away.debugFrame.motion.map { String(format: "%.1f %%", $0 * 100) } ?? "–")
                 reading("No face for", String(format: "%.1f s", away.debugFrame.sinceFace))
                 reading("Still for", String(format: "%.1f s", away.debugFrame.sinceMovement))

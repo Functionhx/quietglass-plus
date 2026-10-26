@@ -12,6 +12,7 @@ T = {
     "离开或出现其他人时遮挡，认出已保存的面孔后自动解除。",
 "Cover after I leave for": "离开多久后遮挡", "Looking down or away briefly does not count.": "短暂低头或转开视线不算离开。",
 "%d seconds": "%d 秒",
+"Person in frame": "人像占比", "not needed (face seen)": "无需计算（已见到脸）",
 "Confirm saved faces": "确认使用已保存的面孔", "Confirm…": "确认…",
 "macOS asked before sharing your saved faces with protection. Confirm once with Touch ID or your Mac password.": "macOS 需要你确认后才能让保护功能读取已保存的面孔。请用 Touch ID 或 Mac 密码确认一次。",
 "QuietGlass Debug": "QuietGlass 调试", "Camera off while covered": "遮挡期间摄像头已关闭", "Camera not running": "摄像头未运行",

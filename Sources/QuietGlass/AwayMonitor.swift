@@ -36,6 +36,7 @@ struct AwayDebugFrame {
     var faces: [Face] = []
     var strictFaces = 0, looseFaces = 0
     var motion: Double?
+    var personCoverage: Double?
     var sinceFace: TimeInterval = 0
     var sinceMovement: TimeInterval = 0
     var onlooker = false
@@ -113,6 +114,9 @@ final class AwayMonitor: ObservableObject {
     /// Below this best similarity to every saved sample, a readable face is a stranger.
     /// Between this and a match, it's uncertain (angle, light) and nothing happens.
     static let strangerSimilarity: Float = 0.25
+    /// Share of the frame a segmented person must cover to count as present
+    /// (someone seated measured 19–40 %).
+    static let personThreshold = 0.05
     private var strangerStreak = 0
     private var ownerStreak = 0
     /// Someone else is facing the screen (Honor-style "someone is peeking").
@@ -305,7 +309,7 @@ final class AwayMonitor: ObservableObject {
         if failure != nil { failure = nil }
         let saved = savedFaceIndices(sample)
         let primary = largestFace(sample)
-        if (sample.people ?? sample.count) > 0 { lastFaceSeen = sample.capturedAt }
+        if (sample.people ?? sample.count) > 0 || (sample.personCoverage ?? 0) >= Self.personThreshold { lastFaceSeen = sample.capturedAt }
         if let motion = sample.motion, motion >= policy.activityThreshold { lastMovement = sample.capturedAt }
         defer { if debugging { publishDebug(sample, saved: saved, primary: primary) } }
         if covered {
@@ -318,8 +322,10 @@ final class AwayMonitor: ObservableObject {
             }
             return
         }
-        let people = sample.people ?? sample.count
-        recent.append((sample.capturedAt, sample.count, people, sample.motion ?? -1))
+        // A person in the picture counts even when their face isn't detected.
+        let segmented = (sample.personCoverage ?? 0) >= Self.personThreshold ? 1 : 0
+        let people = max(sample.people ?? sample.count, segmented)
+        recent.append((sample.capturedAt, sample.count, people, sample.personCoverage ?? sample.motion ?? -1))
         if recent.count > 60 { recent.removeFirst(recent.count - 60) }
         if policy.observe(faceCount: people, motion: sample.motion, at: sample.capturedAt) { becameAway(stalled: false); return }
         if recognizing, let primary, let faces {
@@ -420,6 +426,7 @@ final class AwayMonitor: ObservableObject {
         frame.strictFaces = sample.count
         frame.looseFaces = sample.people ?? sample.count
         frame.motion = sample.motion
+        frame.personCoverage = sample.personCoverage
         frame.sinceFace = max(0, sample.capturedAt - lastFaceSeen)
         frame.sinceMovement = max(0, sample.capturedAt - lastMovement)
         frame.onlooker = onlooker
