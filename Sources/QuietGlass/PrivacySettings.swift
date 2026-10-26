@@ -272,8 +272,9 @@ private struct PrivacySettingsView: View {
         }
         .sheet(isPresented: $settingUpOwner) {
             OwnerEnrollmentView(owner: model.nearby.owner)
-                .onAppear { model.pauseCamera(for: .ownerEnrollment) }
-                .onDisappear { model.resumeCamera(after: .ownerEnrollment) }
+                // Enrollment opens its own camera session; let go of the others.
+                .onAppear { model.pauseCamera(for: .ownerEnrollment); model.away.suspend(for: .ownerEnrollment) }
+                .onDisappear { model.resumeCamera(after: .ownerEnrollment); model.away.resume(after: .ownerEnrollment) }
         }
         .sheet(isPresented: $testingProtection) {
             ProtectionCheckView(check: model.protectionCheck, cameraID: model.nearby.selectedCameraID,
@@ -522,78 +523,111 @@ private struct PrivacySettingsView: View {
     }
 
     @ViewBuilder private var nearbySettings: some View {
-        section("Nearby people") {
+        let owner = model.nearby.owner
+        section("Camera protection") {
             row("Camera", detail: "Choose the camera with the best view of you and the people beside you.") {
                 CameraChoicePicker(cameras: model.nearby.cameras, selection: model.nearby.selectedCameraID,
                                    select: model.selectTrackingCamera, refresh: model.nearby.refreshCameras)
-                .disabled(model.nearby.owner.busy || model.nearby.owner.enrolling)
+                .disabled(owner.busy || owner.enrolling)
             }
             divider
             row("Test my protection", detail: "Preview camera coverage, check both sides, and try your warning or blur.") {
                 Button("Run check") { testingProtection = true }
-                    .disabled(model.nearby.owner.busy || model.nearby.owner.enrolling)
+                    .disabled(owner.busy || owner.enrolling)
             }
             divider
-            row("Protection mode", detail: model.protectionMode == .away
-                ? "Only face detection runs while you work, and the camera turns off once the screen is covered. When you are back, press any key (Touch ID after the time limit)."
-                : "Covers when you leave or another face appears, and clears when it recognizes a saved face.") {
-                Picker("Protection mode", selection: $model.protectionMode) {
-                    ForEach(ProtectionMode.allCases) { Text(verbatim: $0.title).tag($0) }
+            row("Detect additional faces", detail: "One camera, checked a few times a second: are you there, is it you, is anyone peeking, how are you sitting.") {
+                Toggle("Nearby people", isOn: Binding(get: { model.cameraProtectionOn }, set: { model.setCameraProtection($0) }))
+                    .labelsHidden()
+                    .disabled(owner.busy || owner.enrolling)
+            }
+            divider
+            row("Cover after I leave for", detail: "No face and no movement for this long. Looking down or away briefly does not count.") {
+                Picker("Cover after I leave for", selection: Binding(get: { model.away.delay }, set: { model.away.delay = $0 })) {
+                    ForEach([3.0, 5, 10, 30], id: \.self) { Text(LF("%d seconds", Int($0))).tag($0) }
                 }
                 .labelsHidden()
                 .fixedSize()
-                .disabled(model.nearby.owner.busy || model.nearby.owner.enrolling)
             }
             divider
-            row("Detect additional faces", detail: model.protectionMode == .away ? "Master switch: the camera watches for you leaving and covers the screen." : "Uses your camera while you work. AirPods are not required.") {
-                Toggle("Nearby people", isOn: Binding(get: { model.cameraProtectionOn }, set: { model.setCameraProtection($0) }))
-                    .labelsHidden()
-                    .disabled(model.nearby.owner.busy || model.nearby.owner.enrolling)
+            row("Recognize me", detail: owner.enrolled
+                ? "Also covers when the person at the screen isn't a saved face. Runs on the Neural Engine with the same frames."
+                : "Save your face so the screen also covers for anyone else who sits down.") {
+                if owner.enrolled || owner.enabled {
+                    Toggle("Recognize me", isOn: Binding(get: { owner.enabled }, set: { owner.setEnabled($0) }))
+                        .labelsHidden().disabled(owner.busy)
+                } else {
+                    Button("Set up my face") { settingUpOwner = true }.disabled(owner.busy)
+                }
             }
-            if model.protectionMode == .away {
+            if owner.enrolled || showingOwnerDeletion {
                 divider
-                row("Cover after I leave for", detail: "Looking down or away briefly does not count.") {
-                    Picker("Cover after I leave for", selection: Binding(get: { model.away.delay }, set: { model.away.delay = $0 })) {
-                        ForEach([3.0, 5, 10, 30], id: \.self) { Text(LF("%d seconds", Int($0))).tag($0) }
+                row("Saved faces", detail: "Anyone saved here counts as you. Stored in this Mac’s Keychain; adding or deleting asks for Touch ID or your Mac password.") {
+                    Button("Add a face") { settingUpOwner = true }
+                        .disabled(!owner.canAddFace || owner.busy)
+                }
+                ForEach(owner.faces) { face in
+                    HStack(spacing: 10) {
+                        Image(systemName: "person.crop.circle").foregroundStyle(.secondary)
+                        Text(face.name)
+                        Spacer()
+                        InlineDeleteButton(
+                            isBusy: owner.busy,
+                            isDeleted: !owner.faces.contains(face),
+                            onConfirm: { showingOwnerDeletion = true; owner.deleteFace(face.id) },
+                            onFinished: { showingOwnerDeletion = false }
+                        )
                     }
-                    .labelsHidden()
-                    .fixedSize()
+                    .padding(.leading, 4)
+                    .disabled(owner.busy)
                 }
-                divider
-                row("Peek alert", detail: "Like Honor phones: when someone else faces your screen, warn you or blur until they look away.") {
-                    Picker("Peek alert", selection: Binding(get: { model.away.peekResponse }, set: { model.away.peekResponse = $0 })) {
-                        ForEach(PeekResponse.allCases) { Text(verbatim: $0.title).tag($0) }
-                    }
-                    .labelsHidden()
-                    .fixedSize()
-                }
-                divider
-                row("Posture reminders", detail: "Uses the same camera frames, no extra power. Reminds you after a while of leaning in, slumping or tilting your head; never covers the screen.") {
-                    Toggle("Posture reminders", isOn: Binding(get: { model.away.postureReminders }, set: { model.away.postureReminders = $0 })).labelsHidden()
-                }
-                if model.away.postureReminders {
+                if owner.enabled {
                     divider
-                    row("This is how I sit", detail: model.away.calibratingPosture ? "Hold your usual good posture for three seconds…"
-                        : model.away.postureCalibrated ? "Calibrated. Recalibrate if you move your Mac or chair." : "Not calibrated yet: your first minute becomes the reference.") {
-                        Button(model.away.postureCalibrated ? "Recalibrate" : "Calibrate") { model.away.calibratePosture() }
-                            .disabled(model.away.calibratingPosture || !model.away.watching)
+                    row("Unlock when it sees me", detail: "Clears as soon as a saved face looks at the camera. Keeps the camera on while you're away, so it uses more power.") {
+                        Toggle("Unlock when it sees me", isOn: Binding(get: { model.away.unlockWhenRecognized }, set: { model.away.unlockWhenRecognized = $0; model.away.reloadFaces() }))
+                            .labelsHidden()
                     }
                     divider
-                    row("Remind after", detail: "How long a posture must last before a reminder. Each reminder repeats at most every 10 minutes.") {
-                        Picker("Remind after", selection: Binding(get: { model.away.postureHold }, set: { model.away.postureHold = $0 })) {
-                            Text(LF("%d seconds", 30)).tag(30.0)
-                            Text(LF("%d min", 1)).tag(60.0)
-                            Text(LF("%d min", 2)).tag(120.0)
-                            Text(LF("%d min", 5)).tag(300.0)
-                        }
-                        .labelsHidden()
-                        .fixedSize()
+                    row("Saved faces aren’t onlookers", detail: "Family or friends you saved can sit beside you without a peek alert.") {
+                        Toggle("Saved faces aren’t onlookers", isOn: Binding(
+                            get: { model.nearby.trustSavedFaces },
+                            set: { model.nearby.setTrustSavedFaces($0) }
+                        )).labelsHidden()
                     }
                 }
+            }
+            if owner.enabled && model.away.facesNeedConfirmation {
                 divider
-                row("Any key unlocks for", detail: "Right after the screen covers, any key unlocks it. After this time, unlocking needs Touch ID or your Mac password.") {
-                    Picker("Any key unlocks for", selection: Binding(get: { model.away.graceSeconds }, set: { model.away.graceSeconds = $0 })) {
-                        Text("Off").tag(0.0)
+                row("Confirm saved faces", detail: "macOS asked before sharing your saved faces with protection. Confirm once with Touch ID or your Mac password.") {
+                    Button("Confirm…") { model.away.confirmSavedFaces() }
+                }
+            }
+            if let error = owner.error {
+                divider
+                note(error)
+            }
+            divider
+            row("Peek alert", detail: "Like Honor phones: when someone else faces your screen, warn you or blur until they look away.") {
+                Picker("Peek alert", selection: Binding(get: { model.away.peekResponse }, set: { model.away.peekResponse = $0 })) {
+                    ForEach(PeekResponse.allCases) { Text(verbatim: $0.title).tag($0) }
+                }
+                .labelsHidden()
+                .fixedSize()
+            }
+            divider
+            row("Posture reminders", detail: "Uses the same camera frames, no extra power. Reminds you after a while of leaning in, slumping or tilting your head; never covers the screen.") {
+                Toggle("Posture reminders", isOn: Binding(get: { model.away.postureReminders }, set: { model.away.postureReminders = $0 })).labelsHidden()
+            }
+            if model.away.postureReminders {
+                divider
+                row("This is how I sit", detail: model.away.calibratingPosture ? "Hold your usual good posture for three seconds…"
+                    : model.away.postureCalibrated ? "Calibrated. Recalibrate if you move your Mac or chair." : "Not calibrated yet: your first minute becomes the reference.") {
+                    Button(model.away.postureCalibrated ? "Recalibrate" : "Calibrate") { model.away.calibratePosture() }
+                        .disabled(model.away.calibratingPosture || !model.away.watching)
+                }
+                divider
+                row("Remind after", detail: "How long a posture must last before a reminder. Each reminder repeats at most every 10 minutes.") {
+                    Picker("Remind after", selection: Binding(get: { model.away.postureHold }, set: { model.away.postureHold = $0 })) {
                         Text(LF("%d seconds", 30)).tag(30.0)
                         Text(LF("%d min", 1)).tag(60.0)
                         Text(LF("%d min", 2)).tag(120.0)
@@ -602,168 +636,47 @@ private struct PrivacySettingsView: View {
                     .labelsHidden()
                     .fixedSize()
                 }
-                divider
-                row("Unlock with Touch ID", detail: "Esc alone could be pressed by anyone. With this on, Esc asks for Touch ID or your Mac password.") {
-                    Toggle("Unlock with Touch ID", isOn: Binding(get: { model.away.unlockRequiresAuthentication }, set: { model.away.unlockRequiresAuthentication = $0 })).labelsHidden()
-                }
-                divider
-                row("Cover style", detail: model.coverStyle.detail) {
-                    Picker("Cover style", selection: $model.coverStyle) {
-                        ForEach(CoverStyle.allCases.filter { $0 != .glass }) { Text($0.title).tag($0) }
-                    }
-                    .labelsHidden()
-                    .fixedSize()
-                }
-                divider
-                row("Lock Mac when I’m away", detail: "A cover is not a lock. After this long covered with nobody in view, lock macOS too.") {
-                    Picker("Lock Mac when I’m away", selection: $model.autoLockMinutes) {
-                        Text("Never").tag(0)
-                        ForEach([1, 3, 5, 10, 30], id: \.self) { Text(LF("After %d min", $0)).tag($0) }
-                    }
-                    .labelsHidden()
-                    .fixedSize()
-                }
-                if model.away.wantsMonitoring {
-                    divider
-                    row(model.away.status, detail: model.away.lastCoverNote) { EmptyView() }
-                }
-            } else {
-            divider
-            row("Detection", detail: "Facing screen waits for a sustained head direction. Any extra face keeps the more cautious count-based response.") {
-                TrackingChoicePicker(label: "Nearby detection", options: NearbyDetection.allCases.map { ($0.rawValue, $0.title) },
-                                     selection: model.nearby.detection.rawValue) {
-                    if let detection = NearbyDetection(rawValue: $0) { model.nearby.setDetection(detection) }
-                }
             }
             divider
-            row("Recognize me", detail: "Checks your saved face with a small head turn and a look back at the camera before clearing the response.") {
-                if model.nearby.owner.enrolled || model.nearby.owner.enabled {
-                    Toggle("Recognize me", isOn: Binding(get: { model.nearby.owner.enabled }, set: { value in
-                        model.nearby.stop()
-                        model.nearby.owner.setEnabled(value)
-                    })).labelsHidden().disabled(model.nearby.owner.busy)
-                } else {
-                    Button("Set up my face") { model.nearby.stop(); settingUpOwner = true }
-                        .disabled(model.nearby.owner.busy)
-                }
-            }
-            if model.nearby.owner.enrolled || model.nearby.owner.enabled || showingOwnerDeletion {
-                divider
-                row("Saved faces", detail: "Anyone saved here can clear protection. Stored in this Mac’s Keychain; Touch ID or your Mac password is required to add, delete or use them.") {
-                    Button("Add a face") { model.nearby.stop(); settingUpOwner = true }
-                        .disabled(!model.nearby.owner.canAddFace || model.nearby.owner.busy)
-                }
-                ForEach(model.nearby.owner.faces) { face in
-                    HStack(spacing: 10) {
-                        Image(systemName: "person.crop.circle").foregroundStyle(.secondary)
-                        Text(face.name)
-                        Spacer()
-                        InlineDeleteButton(
-                            isBusy: model.nearby.owner.busy,
-                            isDeleted: !model.nearby.owner.faces.contains(face),
-                            onConfirm: {
-                                showingOwnerDeletion = true
-                                model.nearby.stop()
-                                model.nearby.owner.deleteFace(face.id)
-                            },
-                            onFinished: { showingOwnerDeletion = false }
-                        )
-                    }
-                    .padding(.leading, 4)
-                    .disabled(model.nearby.owner.busy)
-                }
-                divider
-                row("Ask for a head turn to unlock", detail: "A small turn before clearing makes a photo harder to use. Right after you unlock your Mac, your face alone is enough.") {
-                    Toggle("Ask for a head turn to unlock", isOn: Binding(
-                        get: { model.nearby.requireMovementCheck },
-                        set: { model.nearby.setRequireMovementCheck($0) }
-                    )).labelsHidden()
-                }
-                divider
-                row("Lock Mac when I’m away", detail: "A cover is not a lock. After this long covered with nobody in view, lock macOS too.") {
-                    Picker("Lock Mac when I’m away", selection: $model.autoLockMinutes) {
-                        Text("Never").tag(0)
-                        ForEach([1, 3, 5, 10, 30], id: \.self) { Text(LF("After %d min", $0)).tag($0) }
-                    }
-                    .labelsHidden()
-                    .fixedSize()
-                }
-                divider
-                row("Saved faces aren’t onlookers", detail: "When everyone in view is saved, the screen stays clear. Turn off to cover whenever a second face appears.") {
-                    Toggle("Saved faces aren’t onlookers", isOn: Binding(
-                        get: { model.nearby.trustSavedFaces },
-                        set: { model.nearby.setTrustSavedFaces($0) }
-                    )).labelsHidden()
-                }
-            }
-            if let error = model.nearby.owner.error {
-                divider
-                note(error)
-            }
-            divider
-            row("Camera response", detail: model.nearby.response == .warning ? "Warns beside the notch first, then blurs if the warning is still unresolved." : "Blurs every display when another face appears or your saved face needs verification. Escape clears it and stops the camera.") {
-                CameraResponsePicker(selection: Binding(
-                    get: { model.nearby.response },
-                    set: { model.setNearbyResponse($0) }
-                ))
-            }
-            divider
-            row("Cover style", detail: model.coverStyle.detail) {
-                Picker("Cover style", selection: $model.coverStyle) {
-                    ForEach(CoverStyle.allCases) { Text($0.title).tag($0) }
+            row("Any key unlocks for", detail: "Right after the screen covers, any key unlocks it. After this time, unlocking needs Touch ID or your Mac password.") {
+                Picker("Any key unlocks for", selection: Binding(get: { model.away.graceSeconds }, set: { model.away.graceSeconds = $0 })) {
+                    Text("Off").tag(0.0)
+                    Text(LF("%d seconds", 30)).tag(30.0)
+                    Text(LF("%d min", 1)).tag(60.0)
+                    Text(LF("%d min", 2)).tag(120.0)
+                    Text(LF("%d min", 5)).tag(300.0)
                 }
                 .labelsHidden()
                 .fixedSize()
             }
-            if model.nearby.response == .warning {
-                divider
-                row("Blur after", detail: "Time to respond before automatic blur. Clearing the alert cancels the timer; Escape stops monitoring.") {
-                    WarningDurationPicker(duration: Binding(
-                        get: { model.nearby.warningDelay },
-                        set: { model.nearby.setWarningDelay($0) }
-                    ))
-                }
+            divider
+            row("Unlock with Touch ID", detail: "Esc alone could be pressed by anyone. With this on, Esc asks for Touch ID or your Mac password.") {
+                Toggle("Unlock with Touch ID", isOn: Binding(get: { model.away.unlockRequiresAuthentication }, set: { model.away.unlockRequiresAuthentication = $0 })).labelsHidden()
             }
             divider
-            row("Play warning sound", detail: "Plays a short sound once when a warning appears beside the notch.") {
-                Toggle("Play warning sound", isOn: Binding(
-                    get: { model.nearby.warningSoundEnabled },
-                    set: { model.nearby.setWarningSoundEnabled($0) }
-                )).labelsHidden()
-            }
-            if model.nearby.enabled || model.nearby.requesting || model.nearby.message != "Off" {
-                divider
-                row(model.nearby.message) {
-                    if model.nearby.temporarilyPaused {
-                        Button("Resume") { model.nearby.resumeNow() }
-                    } else if model.nearby.canRetry {
-                        if model.nearby.status == .unavailable(.screenPermission) {
-                            Button("Open Screen Settings") { model.requestScreenPermission() }
-                        }
-                        if model.nearby.needsCameraPermission {
-                            Button("Camera Settings") {
-                                NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera")!)
-                            }
-                        }
-                        Button("Retry") { model.retryNearbyPeople() }
-                    } else if model.nearby.enabled {
-                        HStack(spacing: 8) {
-                            if model.nearby.needsAttention && !model.nearby.covered {
-                                Button("Blur now") { model.blurNearbyNow() }
-                            }
-                            Button("Pause 5 min") { model.nearby.pauseForFiveMinutes() }
-                        }
-                    }
+            row("Cover style", detail: model.coverStyle.detail) {
+                Picker("Cover style", selection: $model.coverStyle) {
+                    ForEach(CoverStyle.allCases.filter { $0 != .glass }) { Text($0.title).tag($0) }
                 }
+                .labelsHidden()
+                .fixedSize()
             }
             divider
-            if model.nearbyBlurUnavailable {
-                row("Privacy blur unavailable", detail: privacy.notice ?? "Screen capture needs attention.") {
-                    Button("Restore blur") { model.retryNearbyBlur() }
+            row("Lock Mac when I’m away", detail: "A cover is not a lock. After this long covered with nobody in view, lock macOS too.") {
+                Picker("Lock Mac when I’m away", selection: $model.autoLockMinutes) {
+                    Text("Never").tag(0)
+                    ForEach([1, 3, 5, 10, 30], id: \.self) { Text(LF("After %d min", $0)).tag($0) }
                 }
-                divider
+                .labelsHidden()
+                .fixedSize()
             }
-            note("Detection works within your camera’s view. Facing screen estimates head direction, not eye gaze; unreadable faces can still trigger protection. Poor light, glasses, or an obstructed face can cause misses. Recognize me checks your saved face before clearing the response; without it, any steady single face can clear it. Recognition can be fooled by photos or video and does not replace locking your Mac. Camera images are never saved. Your detection setting is remembered, monitoring pauses while your Mac is inactive, and Escape turns it off.", finePrint: true)
+            divider
+            row("Debug", detail: "See what the camera sees: every face boxed and labeled the way QuietGlass judges it, with the numbers behind each decision.") {
+                Button("Open Debug Window") { DebugWindowController.shared.show(model: model) }
+            }
+            if model.away.wantsMonitoring {
+                divider
+                row(model.away.status, detail: model.away.lastCoverNote) { EmptyView() }
             }
         }
     }

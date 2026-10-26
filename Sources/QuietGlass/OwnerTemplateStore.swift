@@ -205,6 +205,28 @@ final class OwnerRecognition: ObservableObject {
         }
     }
 
+    /// Saved faces for always-on camera protection. The Keychain item is limited to
+    /// this app, so it reads without a prompt; if the system insists on asking (e.g.
+    /// after the app's signature changed), fall back to one Touch ID confirmation.
+    func loadForBackgroundProtection(allowPrompt: Bool) async -> FaceProfiles? {
+        guard enabled, enrolled else { return nil }
+        let store = self.store
+        let quiet = LAContext()
+        quiet.interactionNotAllowed = true
+        do {
+            let profiles = try await Task.detached(operation: { try store.read(context: quiet) }).value
+            quiet.invalidate()
+            if profiles.isValid { return profiles }
+        } catch {
+            quiet.invalidate()
+            Diagnostics.log("saved faces: quiet Keychain read failed (\(error))")
+        }
+        // Never block protection on a prompt; Settings offers this explicitly.
+        guard allowPrompt, let context = try? await authenticate("Use your saved faces for QuietGlass camera protection.") else { return nil }
+        defer { context.invalidate() }
+        return try? await Task.detached(operation: { try store.read(context: context) }).value
+    }
+
     func endMonitoring() {
         if saving { profiles = nil; return }
         token += 1

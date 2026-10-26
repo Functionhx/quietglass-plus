@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 
 /// Serializes production camera ownership. Frames/embeddings are never persisted.
@@ -12,9 +13,14 @@ final class SharedFaceCamera: NearbyCameraSession {
     init(hub: FaceCameraHub = .shared, completion: @escaping (Result<NearbyFaceSample, NearbyCameraFailure>) -> Void) {
         self.hub = hub; self.completion = completion
     }
-    func configureRecognition(_ enabled: Bool) { recognition = enabled }
+    func configureRecognition(_ enabled: Bool) {
+        recognition = enabled
+        hub.setRecognition(id, enabled)
+    }
     func configurePresence(_ enabled: Bool) { presence = enabled }
     func configureDevice(_ id: String?) { deviceID = id ?? "" }
+    /// The shared session, for the debug preview.
+    var previewSession: AVCaptureSession? { hub.previewSession }
     func configureRate(_ analysesPerSecond: Double) {
         rate = analysesPerSecond
         hub.setRate(id, analysesPerSecond)
@@ -27,7 +33,7 @@ final class SharedFaceCamera: NearbyCameraSession {
 final class FaceCameraHub {
     static let shared = FaceCameraHub()
     private struct Client {
-        let recognition: Bool
+        var recognition: Bool
         let presence: Bool
         var rate: Double
         let completion: (Result<NearbyFaceSample, NearbyCameraFailure>) -> Void
@@ -69,6 +75,13 @@ final class FaceCameraHub {
             }
         }
     }
+    func setRecognition(_ id: UUID, _ enabled: Bool) {
+        queue.async { [self] in
+            guard clients[id] != nil, clients[id]?.recognition != enabled else { return }
+            clients[id]?.recognition = enabled
+            camera?.configureRecognition(clients.values.contains(where: \.recognition))
+        }
+    }
     func setRate(_ id: UUID, _ rate: Double) {
         queue.async { [self] in
             guard clients[id] != nil, clients[id]?.rate != rate else { return }
@@ -87,5 +100,6 @@ final class FaceCameraHub {
             }
         }
     }
+    var previewSession: AVCaptureSession? { queue.sync { camera?.previewSession } }
     func flush() async { await withCheckedContinuation { continuation in queue.async { continuation.resume() } } }
 }

@@ -276,6 +276,14 @@ public struct FaceProfiles: Codable, Equatable {
             .max { $0.template.medianSimilarity(vector) < $1.template.medianSimilarity(vector) }
     }
 
+    /// Highest cosine similarity to any saved sample of anyone. Used to call someone a
+    /// stranger only when they are clearly unlike every saved face; matching a face
+    /// still uses the stricter per-template rule above.
+    public func bestSimilarity(_ vector: [Float]) -> Float {
+        guard let v = OwnerTemplate.normalize(vector) else { return -1 }
+        return profiles.flatMap(\.template.vectors).map { OwnerTemplate.similarity($0, v) }.max() ?? -1
+    }
+
     /// Reads the current payload, or the single-template payload saved by QuietGlass 0.1.x.
     public static func decode(_ data: Data) -> FaceProfiles? {
         let decoder = JSONDecoder()

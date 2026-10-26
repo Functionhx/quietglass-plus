@@ -56,13 +56,22 @@ public struct NearbyAttentionPolicy {
     private var primaryID: Int?
     private var candidates: [Int: TimeInterval] = [:]
     private var lastTime: TimeInterval?
+    /// Samples further apart than this restart tracking. Upstream analyzed ~10/s;
+    /// away mode samples at 2/s, so it passes a larger gap.
+    public var maxGap: TimeInterval = 0.6
+    /// Extra faces smaller than this (fraction of frame height) are ignored: posters,
+    /// photos and faces on phone or monitor screens in the background.
+    public var minimumHeight: CGFloat = 0
     public init() {}
+
+    /// Faces currently counted as facing the screen (for the debug view).
+    public private(set) var facingIndices: Set<Int> = []
 
     /// A forward-facing extra face must persist. Unknown pose uses a longer,
     /// conservative dwell rather than silently assuming the person is harmless.
     public mutating func observe(_ faces: [CameraFace], ownerIndex: Int? = nil, at time: TimeInterval) -> Bool {
         guard time.isFinite, lastTime.map({ time > $0 }) ?? true else { return false }
-        if let lastTime, time - lastTime > 0.6 { candidates = [:]; tracks = FaceTracks(); primaryID = nil }
+        if let lastTime, time - lastTime > maxGap { candidates = [:]; tracks = FaceTracks(); primaryID = nil }
         lastTime = time
         let ids = tracks.update(faces, at: time)
         if let ownerIndex, ids.indices.contains(ownerIndex) { primaryID = ids[ownerIndex] }
@@ -82,10 +91,13 @@ public struct NearbyAttentionPolicy {
         }
         var next: [Int: TimeInterval] = [:]
         var attention = false
+        facingIndices = []
         for (index, face) in faces.enumerated() where face.valid && ids[index] >= 0 && ids[index] != primaryID {
+            guard face.bounds.height >= minimumHeight else { continue }
             let known = face.hasPose
             let facing = !known || (abs(face.yaw!) <= 0.61 && abs(face.pitch!) <= 0.52)
             guard facing else { continue }
+            facingIndices.insert(index)
             let id = ids[index], start = candidates[id] ?? time
             next[id] = start
             if time - start >= (known ? 0.7 : 1.2) { attention = true }

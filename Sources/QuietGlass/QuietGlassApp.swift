@@ -129,6 +129,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         item("QuietGlass Help", #selector(showHelp), in: helpMenu)
         item("Report a Bug…", #selector(reportIssue), in: helpMenu)
         item("Show Diagnostics Log", #selector(showDiagnostics), in: helpMenu)
+        item("Open Debug Window", #selector(showDebug), in: helpMenu)
         helpItem.submenu = helpMenu
         mainMenu.addItem(helpItem)
         NSApp.helpMenu = helpMenu
@@ -183,6 +184,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         model.nearby.restore()
         model.away.restore()
         // Documentation screenshots: open straight to camera protection.
+        if CommandLine.arguments.contains("--debug-window") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+                guard let self else { return }
+                DebugWindowController.shared.show(model: self.model)
+            }
+        }
         if CommandLine.arguments.contains("--show-nearby-settings") {
             privacySettings.show()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in self?.privacySettings.showNearbyPeople() }
@@ -288,6 +295,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func checkForUpdates() { privacySettings.showUpdates(); Task { await model.updates.check() } }
     @objc private func reportIssue() { model.reportBug() }
     @objc private func showDiagnostics() { Diagnostics.reveal() }
+    @objc private func showDebug() { DebugWindowController.shared.show(model: model) }
     private func openProjectPage(_ path: String) {
         guard let url = URL(string: "https://github.com/Functionhx/quietglass-plus/\(path)") else { return }
         NSWorkspace.shared.open(url)

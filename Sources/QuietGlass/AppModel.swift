@@ -101,6 +101,7 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
     /// "Cover when I leave" mode: detection only, manual unlock, camera off while covered.
     let away = AwayMonitor()
     private var awayObservation: AnyCancellable?
+    private var ownerObservation: AnyCancellable?
     @Published var protectionMode = ProtectionMode.saved {
         didSet {
             guard protectionMode != oldValue else { return }
@@ -239,6 +240,11 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
             else { self.dismissShield() }
         }
         away.onCoverage = { [weak self] _ in self?.updateCover() }
+        let owner = nearby.owner
+        away.loadFaces = { [weak owner] allowPrompt in await owner?.loadForBackgroundProtection(allowPrompt: allowPrompt) }
+        ownerObservation = nearby.owner.$faces.dropFirst().combineLatest(nearby.owner.$enabled.dropFirst())
+            .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
+            .sink { [weak self] _ in self?.away.reloadFaces() }
         away.onOnlooker = { [weak self] watching in self?.updateOnlooker(watching) }
         away.onPosture = { [weak self] issue in
             guard let self, !self.away.covered, !self.away.onlooker else { return }
@@ -423,9 +429,10 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
         // "Away" always uses the capture-free cover: the camera is off, nothing else runs.
         let wanted = away.covered || peekCovered || (!coverStyle.usesScreenCapture && (nearby.covered || demoCovered || headCovered))
         guard wanted else { cover.hide(); graceTimer?.invalidate(); graceTimer = nil; refreshEscape(); return }
-        let title = away.covered ? L("You stepped away") : peekCovered ? L("Someone is looking at your screen") : nearby.covered ? nearby.noticeTitle : headCovered ? L("Looking away") : L("Protection check")
+        let title = away.covered ? (away.coverReason == .stranger ? L("This isn't you") : L("You stepped away")) : peekCovered ? L("Someone is looking at your screen") : nearby.covered ? nearby.noticeTitle : headCovered ? L("Looking away") : L("Protection check")
+        let keyHint = away.withinGrace || !away.unlockRequiresAuthentication ? L("Press any key to unlock") : L("Press Esc to unlock with Touch ID")
         let detail = away.covered
-            ? (away.withinGrace || !away.unlockRequiresAuthentication ? L("Press any key to unlock") : L("Press Esc to unlock with Touch ID"))
+            ? (away.unlockWhenRecognized && away.recognizing ? LF("Look at the camera, or: %@", keyHint) : keyHint)
             : peekCovered ? L("Clears when they look away")
             : nearby.owner.enabled && nearby.covered ? String(localized: "Look at the camera to unlock") : ""
         if cover.badge.title != title { cover.badge.title = title }

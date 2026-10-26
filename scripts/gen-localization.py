@@ -33,7 +33,11 @@ def literals():
 found = literals()
 for prefix, value in prefixes.items():
     matches = [k for k in found if k.startswith(prefix)]
-    if len(matches) != 1: sys.exit(f"prefix {prefix[:40]!r} matches {len(matches)} strings")
+    if not matches:   # the source text was removed; keep going
+        print(f"note: unused prefix translation {prefix[:40]!r}", file=sys.stderr)
+        del table[prefix + "*"]
+        continue
+    if len(matches) > 1: sys.exit(f"prefix {prefix[:40]!r} matches {len(matches)} strings")
     table[matches[0]] = value
     del table[prefix + "*"]
 
