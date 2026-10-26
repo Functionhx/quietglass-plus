@@ -187,8 +187,17 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
             guard let self else { return }
             self.privacy.setNearbyMonitoring(value && self.coverStyle.usesScreenCapture)
         }
-        protectionCheck.onBegin = { [weak self] in self?.nearby.suspend(for: .protectionTest); self?.pauseCamera(for: .protectionTest) }
-        protectionCheck.onEnd = { [weak self] in self?.nearby.resume(after: .protectionTest); self?.resumeCamera(after: .protectionTest) }
+        // The check opens its own camera session. Away mode must let go of the camera too:
+        // two sessions fight over the device, and a starved away monitor reads it as
+        // "nobody here" and covers the screen.
+        protectionCheck.onBegin = { [weak self] in
+            self?.nearby.suspend(for: .protectionTest); self?.away.suspend(for: .protectionTest); self?.pauseCamera(for: .protectionTest)
+            Diagnostics.log("protection check started; away paused")
+        }
+        protectionCheck.onEnd = { [weak self] in
+            self?.nearby.resume(after: .protectionTest); self?.away.resume(after: .protectionTest); self?.resumeCamera(after: .protectionTest)
+            Diagnostics.log("protection check ended; away resumed")
+        }
         protectionCheck.onDemoCoverage = { [weak self] value in
             guard let self else { return }
             if self.coverStyle.usesScreenCapture { self.privacy.setTestCovered(value) }
