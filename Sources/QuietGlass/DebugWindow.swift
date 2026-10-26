@@ -135,7 +135,7 @@ private struct DebugView: View {
     }
 }
 
-/// Mirrored like a mirror, matching how the overlay is drawn.
+/// Mirrored like a mirror (as in FaceTime), matching how the overlay is drawn.
 private struct DebugPreview: NSViewRepresentable {
     let session: AVCaptureSession
     func makeNSView(context: Context) -> PreviewView { PreviewView(session: session) }
@@ -149,16 +149,28 @@ private struct DebugPreview: NSViewRepresentable {
             super.init(frame: .zero)
             wantsLayer = true
             preview.videoGravity = .resizeAspect
+            // Mirror with the layer itself: the connection may not exist yet when the
+            // view first lays out, so a connection setting can silently not apply.
+            preview.setAffineTransform(CGAffineTransform(scaleX: -1, y: 1))
             layer?.addSublayer(preview)
         }
         required init?(coder: NSCoder) { nil }
         override func layout() {
             super.layout()
+            CATransaction.begin(); CATransaction.setDisableActions(true)
             preview.frame = bounds
-            if let connection = preview.connection, connection.isVideoMirroringSupported {
-                connection.automaticallyAdjustsVideoMirroring = false
-                connection.isVideoMirrored = true
-            }
+            CATransaction.commit()
+            unmirrorConnection()
+        }
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.unmirrorConnection() }
+        }
+        /// Keep the connection itself unmirrored so the layer flip isn't undone.
+        private func unmirrorConnection() {
+            guard let connection = preview.connection, connection.isVideoMirroringSupported else { return }
+            connection.automaticallyAdjustsVideoMirroring = false
+            connection.isVideoMirrored = false
         }
     }
 }
