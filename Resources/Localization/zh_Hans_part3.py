@@ -4,8 +4,8 @@ T = {
 "General": "通用", "Protection": "保护", "App rules": "App 规则", "Head tracking": "头部追踪",
 "profile home office public focus full screen demo recording shortcut privacy appearance blur strength preview launch login updates":
     "profile home office public focus full screen demo recording shortcut privacy appearance blur strength preview launch login updates 情景 家 办公室 公共 专注 全屏 演示 录制 快捷键 隐私 外观 模糊 强度 预览 登录 启动 更新 语言",
-"window area saved remember sensitive text phrases keys email card camera nearby people coverage test side preview":
-    "window area saved remember sensitive text phrases keys email card camera nearby people coverage test side preview 窗口 区域 保存 记住 敏感 文字 短语 密钥 邮箱 银行卡 摄像头 附近 有人 覆盖 测试 遮挡 效果 折叠 幕布 面孔 识别",
+"window area saved remember camera nearby people coverage test side preview":
+    "window area saved remember camera nearby people coverage test side preview 窗口 区域 保存 记住 摄像头 附近 有人 覆盖 测试 遮挡 效果 折叠 幕布 面孔 识别 离开 偷窥 坐姿 解锁",
 "applications rules stronger pause automatic windows": "applications rules stronger pause automatic windows 应用 规则 更强 暂停 自动 窗口",
 "camera airpods motion setup recenter calibration learning sensitivity monitor external displays screen head position":
     "camera airpods motion setup recenter calibration learning sensitivity monitor external displays screen head position 摄像头 运动 设置 居中 校准 学习 灵敏度 显示器 外接 屏幕 头部 位置",

@@ -913,7 +913,7 @@ final class AppModel: NSObject, ObservableObject, CMHeadphoneMotionManagerDelega
     /// while something is actually covering or blurring the screen; monitoring alone
     /// (Nearby people, away mode, head tracking) leaves Escape to the frontmost app.
     private func refreshEscape() {
-        let visibleProtection = !privacy.paused && (privacy.selectedWindow != nil || !privacy.protectedAreas.isEmpty || privacy.focusEnabled || privacy.scanEnabled)
+        let visibleProtection = !privacy.paused && (privacy.selectedWindow != nil || !privacy.protectedAreas.isEmpty || privacy.focusEnabled)
         shortcuts.armEscape(cover.isCovered || coverage > 0 || privacy.fullScreen || visibleProtection || overlay.isCapturing)
     }
 

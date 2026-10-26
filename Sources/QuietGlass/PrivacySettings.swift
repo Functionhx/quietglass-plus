@@ -150,7 +150,7 @@ private enum SettingsPage: String, CaseIterable, Identifiable {
     var searchTerms: String {
         switch self {
         case .general: return "profile home office public focus full screen demo recording shortcut privacy appearance blur strength preview launch login updates"
-        case .protection: return "window area saved remember sensitive text phrases keys email card camera nearby people coverage test side preview"
+        case .protection: return "window area saved remember camera nearby people coverage test side preview"
         case .appRules: return "applications rules stronger pause automatic windows"
         case .headTracking: return "camera airpods motion setup recenter calibration learning sensitivity monitor external displays screen head position"
         }
@@ -161,11 +161,9 @@ private struct PrivacySettingsView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var privacy: PrivacyController
     @ObservedObject var windowState: SettingsWindowState
-    @State private var editingPhrases = false
     @State private var settingUpOwner = false
     @State private var testingProtection = false
     @State private var showingOwnerDeletion = false
-    @State private var phraseDraft = ""
     @State private var page: SettingsPage = .general
     @State private var sidebarPinned = false
     @State private var sidebarRevealed = false
@@ -272,7 +270,6 @@ private struct PrivacySettingsView: View {
             if page != .general { backHistory.append(page); forwardHistory.removeAll() }
             page = .general
         }
-        .sheet(isPresented: $editingPhrases) { phraseEditor }
         .sheet(isPresented: $settingUpOwner) {
             OwnerEnrollmentView(owner: model.nearby.owner)
                 .onAppear { model.pauseCamera(for: .ownerEnrollment) }
@@ -326,28 +323,6 @@ private struct PrivacySettingsView: View {
             sidebarPinned.toggle()
             sidebarRevealed = false
         }
-    }
-
-    private var phraseEditor: some View {
-            VStack(alignment: .leading, spacing: 18) {
-                Text("Custom phrases").font(.system(size: 23, weight: .semibold))
-                Text("Add one phrase per line. Matches ignore capitalization. Up to 50 phrases, stored only on this Mac.")
-                    .foregroundStyle(SettingsPalette.secondary)
-                TextEditor(text: $phraseDraft)
-                    .font(.system(size: 13))
-                    .scrollContentBackground(.hidden)
-                    .padding(10)
-                    .background(SettingsPalette.card, in: RoundedRectangle(cornerRadius: 12))
-                    .accessibilityLabel("Phrases to protect")
-                Text("Text recognition can miss matches, especially across line breaks.")
-                    .font(.system(size: 12)).foregroundStyle(SettingsPalette.secondary)
-                Button("Save phrases") { privacy.savePhrases(phraseDraft); editingPhrases = false }
-                    .buttonStyle(QuietGlassButtonStyle())
-                    .controlSize(.large)
-                    .keyboardShortcut(.defaultAction)
-            }
-            .padding(28).frame(width: 460, height: 380)
-            .background(SettingsPalette.background).preferredColorScheme(.dark)
     }
 
     private var navigationSidebar: some View {
@@ -456,7 +431,6 @@ private struct PrivacySettingsView: View {
             maintenanceSettings.id("maintenance")
         case .protection:
             windowProtection
-            sensitiveProtection
             nearbySettings.id("nearbyPeople")
             protectionStatus
         case .appRules:
@@ -915,37 +889,6 @@ private struct PrivacySettingsView: View {
         }
     }
 
-    @ViewBuilder private var sensitiveProtection: some View {
-        section("Sensitive text") {
-            row("Blur detected sensitive text", detail: "Find and blur sensitive areas using recognition on your Mac.") {
-                Toggle("Blur detected sensitive text", isOn: $privacy.scanEnabled).labelsHidden()
-            }
-            if privacy.scanEnabled {
-                divider
-                row("Credentials and API keys") {
-                    Toggle("Credentials and API keys", isOn: option(.credentials)).labelsHidden()
-                }
-                divider
-                row("Email addresses") {
-                    Toggle("Email addresses", isOn: option(.emailAddresses)).labelsHidden()
-                }
-                divider
-                row("Payment card numbers") {
-                    Toggle("Payment card numbers", isOn: option(.paymentCards)).labelsHidden()
-                }
-                divider
-                row("Custom phrases", detail: privacy.customPhrases.isEmpty ? "Choose words or phrases you want to keep private." : "\(privacy.customPhrases.count) phrases saved on this Mac.") {
-                    Button("Edit phrases…") { phraseDraft = privacy.customPhrases.joined(separator: "\n"); editingPhrases = true }
-                }
-                divider
-                row("Detected regions") {
-                    Text("\(privacy.detectedCount)").monospacedDigit().foregroundStyle(SettingsPalette.secondary)
-                }
-            }
-            divider
-            note("Screen content stays on your Mac. Recognized text is never saved. Detection can miss text or react after it appears.")
-        }
-    }
 
     @ViewBuilder private var appearanceSettings: some View {
         section("Blur appearance") {
@@ -955,7 +898,7 @@ private struct PrivacySettingsView: View {
 
     private var protectionStatus: some View {
         VStack(alignment: .leading, spacing: 16) {
-            if (privacy.selectedWindow != nil || !privacy.protectedAreas.isEmpty || privacy.hasAutomaticProtection || privacy.scanEnabled || privacy.focusEnabled || privacy.nearbyMonitoring) && !privacy.fullScreen {
+            if (privacy.selectedWindow != nil || !privacy.protectedAreas.isEmpty || privacy.hasAutomaticProtection || privacy.focusEnabled || privacy.nearbyMonitoring) && !privacy.fullScreen {
                 section("Protection status") {
                     row(privacy.captureUnavailable ? "Capture needs attention" : privacy.paused ? "Protection paused" : "Protection active",
                         detail: "Pause clears window, text, and Focus protection. Turn Nearby people off separately.") {
@@ -1213,11 +1156,6 @@ private struct PrivacySettingsView: View {
         Text(title).font(.system(size: 12, design: .monospaced)).foregroundStyle(SettingsPalette.accent)
     }
 
-    private func option(_ value: SensitiveTextOptions) -> Binding<Bool> {
-        Binding(get: { privacy.scanOptions.contains(value) }, set: { enabled in
-            if enabled { privacy.scanOptions.insert(value) } else { privacy.scanOptions.remove(value) }
-        })
-    }
 }
 
 private struct SettingsSwitchStyle: ToggleStyle {

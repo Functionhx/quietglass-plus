@@ -27,7 +27,6 @@ final class PrivacyController: NSObject, ObservableObject, SCContentSharingPicke
     var onPrepareAreaSelection: (() -> Void)?
     @Published private(set) var selectedWindow: ProtectedWindow?
     @Published private(set) var notice: String?
-    @Published private(set) var detectedCount = 0
     @Published private(set) var captureUnavailable = false
     @Published private(set) var ready = false
     @Published private(set) var rules: [AppPrivacyRule]
@@ -39,13 +38,6 @@ final class PrivacyController: NSObject, ObservableObject, SCContentSharingPicke
     @Published private(set) var nearbyCovered = false
     @Published private(set) var testCovered = false
     @Published private(set) var displayNames = NSScreen.screens.map(\.localizedName)
-    @Published private(set) var customPhrases: [String]
-    @Published var scanEnabled: Bool {
-        didSet { UserDefaults.standard.set(scanEnabled, forKey: "privacyScanEnabled"); paused = false; restartCapture() }
-    }
-    @Published var scanOptions: SensitiveTextOptions {
-        didSet { UserDefaults.standard.set(scanOptions.rawValue, forKey: "privacyScanOptions"); restartCapture() }
-    }
 
     var onRulesChanged: (() -> Void)?
     var onActivityChanged: (() -> Void)?
@@ -65,8 +57,6 @@ final class PrivacyController: NSObject, ObservableObject, SCContentSharingPicke
     private var timer: Timer?
     private(set) var surfaces: [CGDirectDisplayID: PrivacySurface] = [:]
     private var captures: [CGDirectDisplayID: DisplayCapture] = [:]
-    private var analyzers: [CGDirectDisplayID: LocalTextAnalyzer] = [:]
-    private var detected: [CGDirectDisplayID: [CGRect]] = [:]
     private var visibleRegions: [CGRect] = []
     private var controlRegions: [CGRect] = []
     private var focusWindow: CGRect?
@@ -76,9 +66,6 @@ final class PrivacyController: NSObject, ObservableObject, SCContentSharingPicke
 
     override init() {
         let prefs = UserDefaults.standard
-        customPhrases = prefs.stringArray(forKey: "privacyCustomPhrases") ?? []
-        scanEnabled = prefs.bool(forKey: "privacyScanEnabled")
-        scanOptions = SensitiveTextOptions(rawValue: prefs.object(forKey: "privacyScanOptions") == nil ? 1 : prefs.integer(forKey: "privacyScanOptions"))
         rules = prefs.data(forKey: "privacyAppRules").flatMap { try? JSONDecoder().decode([AppPrivacyRule].self, from: $0) } ?? []
         savedAreas = (prefs.data(forKey: "privacySavedAreas").flatMap { try? JSONDecoder().decode([SavedWindowArea].self, from: $0) } ?? []).filter(\.isValid)
         super.init()
@@ -98,7 +85,7 @@ final class PrivacyController: NSObject, ObservableObject, SCContentSharingPicke
 
     var fullScreen: Bool { instant || nearbyCovered || testCovered }
     var hasAutomaticProtection: Bool { rules.contains(where: \.protectWindows) || !savedAreas.isEmpty }
-    var wantsProtection: Bool { fullScreen || nearbyMonitoring || (!paused && (selectedWindow != nil || !protectedAreas.isEmpty || scanEnabled || focusEnabled || hasAutomaticProtection)) }
+    var wantsProtection: Bool { fullScreen || nearbyMonitoring || (!paused && (selectedWindow != nil || !protectedAreas.isEmpty || focusEnabled || hasAutomaticProtection)) }
 
     func setFocus(_ value: Bool) {
         guard value != focusEnabled else { return }
@@ -128,11 +115,6 @@ final class PrivacyController: NSObject, ObservableObject, SCContentSharingPicke
         onActivityChanged?()
     }
 
-    func savePhrases(_ text: String) {
-        customPhrases = SensitiveText.cleanPhrases(text.components(separatedBy: .newlines))
-        UserDefaults.standard.set(customPhrases, forKey: "privacyCustomPhrases")
-        if scanEnabled { restartCapture() }
-    }
     var ruleMode: AppProtectionMode { rules.first { $0.bundleID == frontBundleID }?.mode ?? .standard }
     var canPickWindow: Bool { if #available(macOS 15.2, *) { return true }; return false }
 
@@ -391,19 +373,14 @@ final class PrivacyController: NSObject, ObservableObject, SCContentSharingPicke
                 if surface.panel.frame != screen.frame {
                     surface.resize(to: screen.frame)
                     captures.removeValue(forKey: id)?.stop()
-                    analyzers.removeValue(forKey: id)?.cancel()
-                    detected.removeValue(forKey: id)
                 }
             }
             else { surfaces[id] = PrivacySurface(screen: screen, includeInCaptures: includeInCaptures) }
         }
         for id in Set(surfaces.keys).subtracting(live) {
             captures.removeValue(forKey: id)?.stop()
-            analyzers.removeValue(forKey: id)?.cancel()
-            detected.removeValue(forKey: id)
             surfaces.removeValue(forKey: id)?.panel.close()
         }
-        detectedCount = detected.values.reduce(0) { $0 + $1.count }
     }
 
     private func windowList(onScreen: Bool) -> [[String: Any]] {
@@ -589,9 +566,8 @@ final class PrivacyController: NSObject, ObservableObject, SCContentSharingPicke
             if focusEnabled, !paused {
                 regions += ScreenRegions.visible(surface.panel.frame, behind: controlRegions + (focusWindow.map { [$0] } ?? []))
             }
-            let sensitive = (paused ? [] : detected[id] ?? []).flatMap { ScreenRegions.visible(ScreenRegions.fromVision($0, in: surface.panel.frame), behind: controlRegions) }
-            captures[id]?.setRenderingEnabled(fullScreen || !regions.isEmpty || !sensitive.isEmpty)
-            surface.update(windows: fullScreen ? [] : regions, sensitive: fullScreen ? [] : sensitive, fullScreen: fullScreen, peeking: peeking && instant && !nearbyCovered)
+            captures[id]?.setRenderingEnabled(fullScreen || !regions.isEmpty)
+            surface.update(windows: fullScreen ? [] : regions, sensitive: [], fullScreen: fullScreen, peeking: peeking && instant && !nearbyCovered)
         }
     }
 
@@ -623,19 +599,8 @@ final class PrivacyController: NSObject, ObservableObject, SCContentSharingPicke
                     config.pixelFormat = kCVPixelFormatType_32BGRA
                     let filter = SCContentFilter(display: display, excludingApplications: own, exceptingWindows: [])
                     if #available(macOS 14.2, *) { filter.includeMenuBar = true }
-                    let analyzer: LocalTextAnalyzer? = self.scanEnabled && !self.paused && !self.instant ? LocalTextAnalyzer(options: self.scanOptions, phrases: self.customPhrases) { [weak self] result in
-                        guard let self, self.generation == token, self.captures[id]?.id == session else { return }
-                        switch result {
-                        case .success(let regions):
-                            self.detected[id] = regions
-                            self.detectedCount = self.detected.values.reduce(0) { $0 + $1.count }
-                            self.render()
-                        case .failure: self.notice = "Text detection is temporarily unavailable. Try pausing and resuming protection."
-                        }
-                    } : nil
-                    self.analyzers[id] = analyzer
                     let capture = DisplayCapture(id: session, filter: filter, configuration: config,
-                        radius: self.blurRadius, renderingEnabled: self.fullScreen || self.focusEnabled || !self.visibleRegions.isEmpty || !(self.detected[id] ?? []).isEmpty,
+                        radius: self.blurRadius, renderingEnabled: self.fullScreen || self.focusEnabled || !self.visibleRegions.isEmpty,
                         onFrame: { [weak self] image in
                             guard let self, self.generation == token, self.captures[id]?.id == session else { return }
                             self.surfaces[id]?.setImage(image)
@@ -647,7 +612,7 @@ final class PrivacyController: NSObject, ObservableObject, SCContentSharingPicke
                         }, onFailure: { [weak self] error in
                             guard let self, self.generation == token, self.captures[id]?.id == session else { return }
                             self.failed(error)
-                        }, onSample: analyzer.map { worker in { buffer in worker.offer(buffer) } })
+                        })
                     self.captures[id] = capture
                     do { try await capture.start() }
                     catch {
@@ -687,12 +652,9 @@ final class PrivacyController: NSObject, ObservableObject, SCContentSharingPicke
         captureTask?.cancel(); captureTask = nil
         timer?.invalidate(); timer = nil
         for capture in captures.values { capture.stop() }
-        for analyzer in analyzers.values { analyzer.cancel() }
-        captures.removeAll(); analyzers.removeAll()
+        captures.removeAll()
         if clearSurfaces {
             ready = false
-            detected.removeAll()
-            detectedCount = 0
             for surface in surfaces.values { surface.clear() }
         }
     }
